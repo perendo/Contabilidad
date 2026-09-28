@@ -72,8 +72,29 @@ async def aplicar_migraciones() -> list[str]:
         driver = raw.driver_connection
         if driver is None:
             raise RuntimeError("conexión asyncpg no disponible para migraciones")
+
+        # Tabla de control de versiones de esquema
+        await driver.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version VARCHAR(255) PRIMARY KEY,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+            );
+            """
+        )
+
+        filas = await driver.fetch("SELECT version FROM schema_migrations;")
+        ya_registradas = {fila["version"] for fila in filas}
+
         for archivo in archivos_ordenados():
+            if archivo.name in ya_registradas:
+                continue
+
             await driver.execute(archivo.read_text(encoding="utf-8"))
+            await driver.execute(
+                "INSERT INTO schema_migrations (version) VALUES ($1) ON CONFLICT DO NOTHING;",
+                archivo.name,
+            )
             aplicadas.append(archivo.name)
     return aplicadas
 

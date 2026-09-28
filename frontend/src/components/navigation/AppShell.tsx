@@ -41,6 +41,7 @@ import DestinationRail from "./DestinationRail";
 import MobileNav from "./MobileNav";
 import SurfacePanel from "./SurfacePanel";
 import { useSesion } from "./SessionContext";
+import { usePathname } from "next/navigation";
 
 export default function AppShell({
   children,
@@ -56,6 +57,11 @@ export default function AppShell({
   acciones?: ReactNode;
 }) {
   const { permisos } = useSesion();
+  const pathname = usePathname();
+
+  if (pathname === "/login") {
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
   return (
     <div className="flex min-h-screen flex-col">
       <div className="flex flex-1">

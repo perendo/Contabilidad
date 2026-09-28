@@ -24,6 +24,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { get } from "@/services/client";
 import { useSesion } from "./SessionContext";
@@ -55,6 +56,7 @@ export default function ContextZone({
   /** Solo para tests. Si no se pasa, la lista se pide a la API. */
   empresas?: EmpresaResumen[];
 }) {
+  const pathname = usePathname();
   const { contexto, cargando, error, recargar } = useSesion();
   const compacto = useCompacto();
   const [hoja, setHoja] = useState(false);
@@ -71,6 +73,7 @@ export default function ContextZone({
   // activa aunque no pueda cambiar. Se deja la lista vacia y el selector se limita a
   // mostrar la actual, en vez de tapar la pantalla con un error.
   const cargarEmpresas = useCallback(async () => {
+    if (pathname === "/login") return;
     if (empresasInyectadas !== undefined) return;
     try {
       const r = await get<RespuestaEmpresas>("/api/v1/companies");
@@ -92,6 +95,8 @@ export default function ContextZone({
     document.addEventListener("keydown", alEsc);
     return () => document.removeEventListener("keydown", alEsc);
   }, [hoja]);
+
+  if (pathname === "/login") return null;
 
   if (cargando && !contexto) {
     return (

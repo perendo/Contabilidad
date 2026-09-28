@@ -369,13 +369,21 @@ El recuento vivo esta en [pendientes.md](pendientes.md).
 
 ### Arranque rápido
 
-En Windows, `start.bat` en la raíz delega en `scripts/dev_start.py`, que comprueba los
-puertos 8000/3000, el venv y `next`, levanta el backend y el frontend en consolas
-separadas, espera al health check y abre el navegador a pantalla completa.
+El sistema cuenta con lanzadores multiplataforma que verifican puertos, entorno virtual y dependencias:
 
-```powershell
-.\start.bat
-```
+- **En Windows:**
+  ```powershell
+  .\start.bat
+  ```
+- **En Linux / macOS:**
+  ```bash
+  chmod +x dev_start.sh
+  ./dev_start.sh
+  ```
+- **Con Docker Compose (ecosistema completo con PostgreSQL):**
+  ```bash
+  docker compose up --build
+  ```
 
 ### Configurar la base de datos
 
@@ -391,8 +399,7 @@ $env:PYTHONPATH="src"
 ..\.venv\Scripts\python.exe -m db.migrate        # aplica 000-022
 ```
 
-Los ficheros deben ser **idempotentes**: el runner no lleva tabla de versionado, así
-que re-aplica los 23 en cada ejecución.
+El runner registra las versiones aplicadas en la tabla `schema_migrations`, evitando re-ejecuciones innecesarias y asegurando trazabilidad del esquema.
 
 ### Primer usuario
 

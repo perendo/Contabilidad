@@ -1,3 +1,4 @@
+import pytest
 """Tests SPEC-001 Polish (T040): suggest < 1 s p95 y árbol < 500 ms con ~10k cuentas."""
 
 from __future__ import annotations
@@ -50,6 +51,7 @@ def _p95(muestras: list[float]) -> float:
     return quantiles(muestras, n=100)[94]
 
 
+@pytest.mark.benchmark
 async def test_suggest_menos_1s_p95(db_session: AsyncSession) -> None:
     await _sembrar_10k(db_session)
     tiempos = []
@@ -61,6 +63,7 @@ async def test_suggest_menos_1s_p95(db_session: AsyncSession) -> None:
     assert _p95(tiempos) < 1.0
 
 
+@pytest.mark.benchmark
 async def test_arbol_menos_500ms(db_session: AsyncSession) -> None:
     await _sembrar_10k(db_session)
     tiempos = []
