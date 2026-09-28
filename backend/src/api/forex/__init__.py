@@ -1,0 +1,1 @@
+"""API del módulo forex (SPEC-016), versión /api/v1."""

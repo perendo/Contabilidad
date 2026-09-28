@@ -1,0 +1,1 @@
+"""Journal API package (SPEC-002)."""

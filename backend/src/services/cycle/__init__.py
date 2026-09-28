@@ -1,0 +1,1 @@
+"""Ciclo contable (SPEC-009): apertura del ejercicio."""

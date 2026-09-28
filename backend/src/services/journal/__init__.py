@@ -1,0 +1,1 @@
+"""Journal domain services (SPEC-002): draft/posting, diario, reversal."""
