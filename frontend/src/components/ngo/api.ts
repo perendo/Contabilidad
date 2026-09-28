@@ -1,3 +1,4 @@
+import { getToken } from "@/services/client";
 import { cabecerasEmpresa } from "../treasury/empresa";
 
 export type SubvencionEstado = "concedida" | "en_curso" | "justificada" | "reintegrada";
@@ -166,7 +167,7 @@ async function manejar(respuesta: Response): Promise<unknown> {
 }
 
 async function descargar(ruta: string, nombre: string): Promise<void> {
-  const respuesta = await fetch(ruta, { headers: { ...cabecerasEmpresa() } });
+  const respuesta = await fetch(ruta, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } });
   if (!respuesta.ok) {
     throw new ApiError(respuesta.status, "No se pudo descargar el fichero");
   }
@@ -206,14 +207,14 @@ export async function listarSubvenciones(
   if (filtros.page) params.set("page", String(filtros.page));
   if (filtros.page_size) params.set("page_size", String(filtros.page_size));
   const respuesta = await fetch(`/api/v1/subvenciones?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaPaginada<Subvencion>;
 }
 
 export async function obtenerSubvencion(id: string): Promise<Subvencion> {
   const respuesta = await fetch(`/api/v1/subvenciones/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Subvencion;
 }
@@ -229,7 +230,7 @@ export async function crearSubvencion(body: {
 }): Promise<Subvencion> {
   const respuesta = await fetch("/api/v1/subvenciones", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as Subvencion;
@@ -247,7 +248,7 @@ export async function editarSubvencion(
 ): Promise<Subvencion> {
   const respuesta = await fetch(`/api/v1/subvenciones/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as Subvencion;
@@ -260,7 +261,7 @@ export async function cambiarEstadoSubvencion(
 ): Promise<Subvencion> {
   const respuesta = await fetch(`/api/v1/subvenciones/${id}/estado`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ estado, asiento_rectificativo_id }),
   });
   return (await manejar(respuesta)) as Subvencion;
@@ -272,7 +273,7 @@ export async function imputarGasto(
 ): Promise<Record<string, unknown>> {
   const respuesta = await fetch(`/api/v1/subvenciones/${subvencionId}/gastos`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as Record<string, unknown>;
@@ -281,7 +282,7 @@ export async function imputarGasto(
 export async function desimputarGasto(subvencionId: string, gastoId: string): Promise<void> {
   const respuesta = await fetch(`/api/v1/subvenciones/${subvencionId}/gastos/${gastoId}`, {
     method: "DELETE",
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   await manejar(respuesta);
 }
@@ -293,21 +294,21 @@ export async function listarAsientos(
   if (filtros.page) params.set("page", String(filtros.page));
   if (filtros.page_size) params.set("page_size", String(filtros.page_size));
   const respuesta = await fetch(`/api/v1/asientos?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaPaginada<Asiento>;
 }
 
 export async function obtenerAsiento(id: string): Promise<Asiento> {
   const respuesta = await fetch(`/api/v1/asientos/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Asiento;
 }
 
 export async function obtenerInforme(subvencionId: string): Promise<InformeJustificacion> {
   const respuesta = await fetch(`/api/v1/informes/subvenciones/${subvencionId}/justificacion`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as InformeJustificacion;
 }
@@ -322,7 +323,7 @@ export async function exportarInforme(subvencionId: string, formato: "csv" | "js
 export async function generarLibros(ejercicio: number, tipos: TipoLibro[]): Promise<LibroGenerado[]> {
   const respuesta = await fetch(`/api/v1/libros/${ejercicio}/generar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ tipos }),
   });
   return (await manejar(respuesta)) as LibroGenerado[];
@@ -330,7 +331,7 @@ export async function generarLibros(ejercicio: number, tipos: TipoLibro[]): Prom
 
 export async function listarLibros(ejercicio: number): Promise<ListaPaginada<Libro>> {
   const respuesta = await fetch(`/api/v1/libros/${ejercicio}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaPaginada<Libro>;
 }
@@ -345,7 +346,7 @@ export async function emitirLegalizacion(
 ): Promise<Legalizacion> {
   const respuesta = await fetch("/api/v1/legalizaciones", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ ejercicio, fecha_legalizacion }),
   });
   return (await manejar(respuesta)) as Legalizacion;
@@ -353,7 +354,7 @@ export async function emitirLegalizacion(
 
 export async function listarLegalizaciones(): Promise<ListaPaginada<Legalizacion>> {
   const respuesta = await fetch(`/api/v1/legalizaciones${paginar()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaPaginada<Legalizacion>;
 }
@@ -364,14 +365,14 @@ export async function descargarLegalizacion(id: string): Promise<void> {
 
 export async function listarCajas(filtros: { page?: number; page_size?: number } = {}): Promise<ListaPaginada<Caja>> {
   const respuesta = await fetch(`/api/v1/cajas${paginar(filtros)}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaPaginada<Caja>;
 }
 
 export async function obtenerCaja(id: string): Promise<DetalleCaja> {
   const respuesta = await fetch(`/api/v1/cajas/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as DetalleCaja;
 }
@@ -383,7 +384,7 @@ export async function crearCaja(body: {
 }): Promise<Caja> {
   const respuesta = await fetch("/api/v1/cajas", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as Caja;
@@ -392,7 +393,7 @@ export async function crearCaja(body: {
 export async function inactivarCaja(id: string): Promise<Caja> {
   const respuesta = await fetch(`/api/v1/cajas/${id}/inactivar`, {
     method: "POST",
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Caja;
 }
@@ -409,7 +410,7 @@ export async function registrarMovimiento(
 ): Promise<Movimiento> {
   const respuesta = await fetch(`/api/v1/cajas/${cajaId}/movimientos`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as Movimiento;
@@ -421,7 +422,7 @@ export async function realizarArqueo(
 ): Promise<Arqueo> {
   const respuesta = await fetch(`/api/v1/cajas/${cajaId}/arqueos`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as Arqueo;
@@ -430,7 +431,7 @@ export async function realizarArqueo(
 export async function aprobarArqueo(arqueoId: string, asiento_ajuste_id?: string | null): Promise<Arqueo> {
   const respuesta = await fetch(`/api/v1/arqueos/${arqueoId}/aprobar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ asiento_ajuste_id }),
   });
   return (await manejar(respuesta)) as Arqueo;
@@ -439,7 +440,7 @@ export async function aprobarArqueo(arqueoId: string, asiento_ajuste_id?: string
 export async function archivarArqueo(arqueoId: string): Promise<Arqueo> {
   const respuesta = await fetch(`/api/v1/arqueos/${arqueoId}/archivar`, {
     method: "POST",
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Arqueo;
 }
@@ -453,7 +454,7 @@ export async function listarArqueos(
   if (filtros.page) params.set("page", String(filtros.page));
   if (filtros.page_size) params.set("page_size", String(filtros.page_size));
   const respuesta = await fetch(`/api/v1/arqueos?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaPaginada<Arqueo>;
 }

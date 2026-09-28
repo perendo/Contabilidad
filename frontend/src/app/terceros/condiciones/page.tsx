@@ -1,3 +1,5 @@
+import { getToken } from "@/services/client";
+import { cabecerasEmpresa } from "@/components/treasury/empresa";
 "use client";
 
 import { useCallback, useState } from "react";
@@ -27,9 +29,7 @@ export default function CondicionesPage() {
     setCargando(true);
     setAviso(null);
     try {
-      const respuesta = await fetch(
-        `/api/v1/terceros/${tercero}/condiciones`
-      );
+      const respuesta = await fetch(`/api/v1/terceros/${tercero}/condiciones`, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } });
       if (!respuesta.ok) {
         throw new ApiError(respuesta.status, "No se pudieron cargar condiciones");
       }
@@ -59,7 +59,7 @@ export default function CondicionesPage() {
         `/api/v1/terceros/${terceroId.trim()}/condiciones`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
           body: JSON.stringify(body),
         }
       );
@@ -81,7 +81,7 @@ export default function CondicionesPage() {
         `/api/v1/terceros/condiciones/${condicion.id}`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
           body: JSON.stringify({ vigente: false }),
         }
       );

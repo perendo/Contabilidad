@@ -1,4 +1,5 @@
 import { cabecerasEmpresa } from "@/components/treasury/empresa";
+import { getToken } from "@/services/client";
 
 export interface CuentaNodo {
   id: string;
@@ -85,7 +86,7 @@ async function manejar(respuesta: Response): Promise<unknown> {
 
 export async function obtenerArbolCuentas(): Promise<ArbolCuentasResponse> {
   const respuesta = await fetch("/api/v1/accounts/tree", {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ArbolCuentasResponse;
 }
@@ -98,7 +99,7 @@ export async function sugerirCuentas(
   params.set("q", q);
   params.set("limit", String(limit));
   const respuesta = await fetch(`/api/v1/accounts/suggest?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as SugerenciasResponse;
 }
@@ -106,7 +107,7 @@ export async function sugerirCuentas(
 export async function crearCuenta(data: CrearCuentaRequest): Promise<CrearCuentaResponse> {
   const respuesta = await fetch("/api/v1/accounts", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(data),
   });
   return (await manejar(respuesta)) as CrearCuentaResponse;
@@ -118,7 +119,7 @@ export async function actualizarCuenta(
 ): Promise<ActualizarCuentaResponse> {
   const respuesta = await fetch(`/api/v1/accounts/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(data),
   });
   return (await manejar(respuesta)) as ActualizarCuentaResponse;
@@ -126,7 +127,7 @@ export async function actualizarCuenta(
 
 export async function obtenerCuenta(id: string): Promise<CuentaNodo> {
   const respuesta = await fetch(`/api/v1/accounts/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as CuentaNodo;
 }

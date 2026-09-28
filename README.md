@@ -367,6 +367,16 @@ El núcleo contable está implementado y verificado. El punto de partida recomen
 sugerido: **030**.
 El recuento vivo esta en [pendientes.md](pendientes.md).
 
+### Acceso y Credenciales de Demostración
+
+La base de datos incluye por defecto un usuario administrador y una empresa de pruebas para poder interactuar de inmediato con todas las pantallas:
+
+- **URL Frontend:** `http://localhost:3000`
+- **Usuario:** `admin@contabilidad.es`
+- **Contraseña:** `admin123`
+- **Empresa activa:** `Empresa Demo S.L.` (NIF: `B12345678`)
+- **Ejercicio fiscal activo:** `2026`
+
 ### Arranque rápido
 
 El sistema cuenta con lanzadores multiplataforma que verifican puertos, entorno virtual y dependencias:

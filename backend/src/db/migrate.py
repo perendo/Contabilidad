@@ -48,6 +48,7 @@ ORDEN_PREFERENTE: tuple[str, ...] = (
     # 022 depende de `user_companies`, que crea 004_iam.sql (ya aplicado antes), asi
     # que va al final sin hueco que reservar.
     "022_favoritos.sql",
+    "023_seed_demo.sql",
 )
 
 

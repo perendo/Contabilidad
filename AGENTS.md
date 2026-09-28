@@ -4,6 +4,8 @@ Guía de contexto para agentes que trabajan en este repositorio. Léela al inici
 cada sesión; el estado completo se persiste en `specs/*/` y `.specify/memory/`.
 
 ## 46. Auditoría Técnica y Actualizaciones (2026-09-28)
+- **Autenticación y Autorización en Frontend**: Corregidos los módulos `components/treasury/api.ts`, `services/acct/api.ts`, `components/forex/api.ts`, `components/inmovilizado/api.ts` y `components/ngo/api.ts` para inyectar la cabecera `Authorization: Bearer <token>` junto con las cabeceras de contexto de empresa (`X-Empresa-Activa`), resolviendo los errores 401 en todas las pantallas.
+- **Migración Seed Demo (`023_seed_demo.sql`)**: Se incorpora la siembra inicial de la empresa "Empresa Demo S.L." (NIF `B12345678`), el usuario `admin@contabilidad.es` (clave `admin123`) con rol `ADMIN`, y el ejercicio 2026 abierto para habilitar la interacción inmediata.
 - **Portabilidad Multiplataforma**: `scripts/dev_start.py` refactorizado para detectar `sys.platform`, usando `webbrowser` y rutas dinámicas `.venv/bin` o `.venv/Scripts`. Se incorpora `dev_start.sh` para entornos Linux/macOS y `docker-compose.yml` con `backend/Dockerfile` y `frontend/Dockerfile`.
 - **UI / Pantalla de Login**: Corregida la zona de contexto `ContextZone.tsx` y `AppShell.tsx` para suprimir la barra de contexto y el shell lateral cuando la ruta activa es `/login`, previniendo errores 401 en peticiones prematuras a `/api/v1/companies`.
 - **Base de Datos y Migraciones**: `backend/src/db/migrate.py` incorpora tracking de versiones aplicadas en la tabla `schema_migrations`.

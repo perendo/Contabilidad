@@ -1,3 +1,4 @@
+import { getToken } from "@/services/client";
 import { cabecerasEmpresa } from "../treasury/empresa";
 
 export type MetodoAmortizacion = "lineal" | "regresivo";
@@ -126,14 +127,14 @@ export async function listarActivos(
   if (filtros.page) params.set("page", String(filtros.page));
   if (filtros.page_size) params.set("page_size", String(filtros.page_size));
   const respuesta = await fetch(`/api/v1/activos?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaActivos;
 }
 
 export async function obtenerActivo(id: string): Promise<Activo> {
   const respuesta = await fetch(`/api/v1/activos/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Activo;
 }
@@ -141,7 +142,7 @@ export async function obtenerActivo(id: string): Promise<Activo> {
 export async function crearActivo(datos: DatosPlan): Promise<Activo> {
   const respuesta = await fetch(`/api/v1/activos`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(datos),
   });
   return (await manejar(respuesta)) as Activo;
@@ -153,7 +154,7 @@ export async function editarActivo(
 ): Promise<Activo> {
   const respuesta = await fetch(`/api/v1/activos/${id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(datos),
   });
   return (await manejar(respuesta)) as Activo;
@@ -162,7 +163,7 @@ export async function editarActivo(
 export async function calcularPlan(datos: DatosPlan): Promise<ResultadoPlan> {
   const respuesta = await fetch(`/api/v1/activos/plan/calcular`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(datos),
   });
   return (await manejar(respuesta)) as ResultadoPlan;
@@ -174,7 +175,7 @@ export async function darDeBaja(
 ) {
   const respuesta = await fetch(`/api/v1/activos/${id}/baja`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(datos),
   });
   return (await manejar(respuesta)) as {
@@ -196,7 +197,7 @@ export async function generarAmortizacion(
 ): Promise<ResultadoGenerar> {
   const respuesta = await fetch(`/api/v1/amortizaciones/generar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ ejercicio, periodo }),
   });
   return (await manejar(respuesta)) as ResultadoGenerar;
@@ -208,7 +209,7 @@ export async function reabrirAmortizacion(
 ): Promise<ResultadoReabrir> {
   const respuesta = await fetch(`/api/v1/amortizaciones/${generadaId}/reabrir`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ motivo }),
   });
   return (await manejar(respuesta)) as ResultadoReabrir;
@@ -230,7 +231,7 @@ export async function listarAmortizaciones(
   if (filtros.page) params.set("page", String(filtros.page));
   if (filtros.page_size) params.set("page_size", String(filtros.page_size));
   const respuesta = await fetch(`/api/v1/amortizaciones?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as { total: number; items: Generada[] };
 }

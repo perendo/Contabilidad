@@ -1,4 +1,5 @@
 import { cabecerasEmpresa } from "./empresa";
+import { getToken } from "@/services/client";
 
 export type RemesaEstado = "borrador" | "emitida" | "cobrada" | "devuelta";
 export type RemesaFormato = "SEPA_DD" | "CSB_19_19";
@@ -68,14 +69,14 @@ export async function listarRemesas(
   if (filtros.limit) params.set("limit", String(filtros.limit));
   if (filtros.offset) params.set("offset", String(filtros.offset));
   const respuesta = await fetch(`/api/v1/remesas?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaRemesas;
 }
 
 export async function obtenerRemesa(id: string): Promise<Remesa> {
   const respuesta = await fetch(`/api/v1/remesas/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Remesa;
 }
@@ -85,7 +86,7 @@ export async function crearRemesa(
 ): Promise<Remesa> {
   const respuesta = await fetch("/api/v1/remesas", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as Remesa;
@@ -94,7 +95,7 @@ export async function crearRemesa(
 export async function emitirRemesa(id: string): Promise<Record<string, unknown>> {
   const respuesta = await fetch(`/api/v1/remesas/${id}/emitir`, {
     method: "POST",
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Record<string, unknown>;
 }
@@ -105,7 +106,7 @@ export async function cobrarRecibo(
 ): Promise<{ recibo: Recibo; asiento_id: string; remesa_id: string }> {
   const respuesta = await fetch(
     `/api/v1/remesas/${remesaId}/recibos/${reciboId}/cobrar`,
-    { method: "POST", headers: { ...cabecerasEmpresa() } }
+    { method: "POST", headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } }
   );
   return (await manejar(respuesta)) as {
     recibo: Recibo;
@@ -116,7 +117,7 @@ export async function cobrarRecibo(
 
 export async function descargarFichero(remesaId: string): Promise<void> {
   const respuesta = await fetch(`/api/v1/remesas/${remesaId}/fichero`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   if (!respuesta.ok) {
     throw new ApiError(respuesta.status, "No se pudo descargar el fichero");
@@ -187,14 +188,14 @@ export async function listarDevoluciones(
   if (filtros.limit) params.set("limit", String(filtros.limit));
   if (filtros.offset) params.set("offset", String(filtros.offset));
   const respuesta = await fetch(`/api/v1/devoluciones?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as { items: Devolucion[]; total: number };
 }
 
 export async function obtenerDevolucion(id: string): Promise<Devolucion> {
   const respuesta = await fetch(`/api/v1/devoluciones/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as Devolucion;
 }
@@ -204,7 +205,7 @@ export async function importarFicheroR19(fichero: File): Promise<ResultadoImport
   datos.append("file", fichero);
   const respuesta = await fetch("/api/v1/devoluciones/import", {
     method: "POST",
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: datos,
   });
   return (await manejar(respuesta)) as ResultadoImport;
@@ -222,7 +223,7 @@ export async function importarDevolucionesJson(
 ): Promise<ResultadoImport> {
   const respuesta = await fetch("/api/v1/devoluciones/import", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ devoluciones }),
   });
   return (await manejar(respuesta)) as ResultadoImport;
@@ -235,7 +236,7 @@ export async function crearReclamacion(
 ): Promise<{ reclamacion_id: string; estado: string }> {
   const respuesta = await fetch(`/api/v1/devoluciones/${devolucionId}/reclamaciones`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ accion, observaciones }),
   });
   return (await manejar(respuesta)) as { reclamacion_id: string; estado: string };
@@ -313,13 +314,13 @@ export async function listarEfectos(filtros: {
   if (filtros.limit) params.append("limit", String(filtros.limit));
   if (filtros.offset) params.append("offset", String(filtros.offset));
   const url = `/api/v1/efectos${params.toString() ? `?${params.toString()}` : ""}`;
-  const respuesta = await fetch(url, { headers: { ...cabecerasEmpresa() } });
+  const respuesta = await fetch(url, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } });
   return (await manejar(respuesta)) as ResumenCartera;
 }
 
 export async function obtenerEfecto(efectoId: string): Promise<DetalleEfecto> {
   const respuesta = await fetch(`/api/v1/efectos/${efectoId}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as DetalleEfecto;
 }
@@ -336,7 +337,7 @@ export async function crearEfecto(payload: {
 }): Promise<{ id: string; estado: EstadoEfecto }> {
   const respuesta = await fetch("/api/v1/efectos", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as { id: string; estado: EstadoEfecto };
@@ -348,7 +349,7 @@ export async function cobrarEfecto(
 ): Promise<{ id: string; estado: EstadoEfecto; asiento_cobro_id: string }> {
   const respuesta = await fetch(`/api/v1/efectos/${efectoId}/cobrar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as {
@@ -369,7 +370,7 @@ export async function impagarEfecto(
 ): Promise<{ id: string; estado: EstadoEfecto; asiento_impago_id: string }> {
   const respuesta = await fetch(`/api/v1/efectos/${efectoId}/impago`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as {
@@ -399,7 +400,7 @@ export async function registrarCobroMedio(payload: {
 }> {
   const respuesta = await fetch("/api/v1/cobros-medio", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as {
@@ -427,7 +428,7 @@ export async function listarCobrosMedio(filtros: {
   if (filtros.limit) params.append("limit", String(filtros.limit));
   if (filtros.offset) params.append("offset", String(filtros.offset));
   const url = `/api/v1/cobros-medio${params.toString() ? `?${params.toString()}` : ""}`;
-  const respuesta = await fetch(url, { headers: { ...cabecerasEmpresa() } });
+  const respuesta = await fetch(url, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } });
   return (await manejar(respuesta)) as { total: number; items: CobroMedioItem[] };
 }
 
@@ -540,13 +541,13 @@ export async function listarAnticipos(filtros: {
   if (filtros.limit) params.append("limit", String(filtros.limit));
   if (filtros.offset) params.append("offset", String(filtros.offset));
   const url = `/api/v1/anticipos${params.toString() ? `?${params.toString()}` : ""}`;
-  const respuesta = await fetch(url, { headers: { ...cabecerasEmpresa() } });
+  const respuesta = await fetch(url, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } });
   return (await manejar(respuesta)) as { total: number; items: AnticipoItem[] };
 }
 
 export async function obtenerAnticipo(id: string): Promise<DetalleAnticipo> {
   const respuesta = await fetch(`/api/v1/anticipos/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as DetalleAnticipo;
 }
@@ -562,7 +563,7 @@ export async function crearAnticipo(payload: {
 }): Promise<{ id: string; tipo: TipoAnticipo; importe: string; saldo_pendiente: string; asiento_id: string }> {
   const respuesta = await fetch("/api/v1/anticipos", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as {
@@ -583,7 +584,7 @@ export async function liquidarAnticipo(
 ): Promise<{ saldo_pendiente: string; liquidaciones_creadas: number }> {
   const respuesta = await fetch(`/api/v1/anticipos/${id}/liquidar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as {
@@ -602,7 +603,7 @@ export async function listarVencimientos(filtros: {
   if (filtros.limit) params.append("limit", String(filtros.limit));
   if (filtros.offset) params.append("offset", String(filtros.offset));
   const url = `/api/v1/vencimientos${params.toString() ? `?${params.toString()}` : ""}`;
-  const respuesta = await fetch(url, { headers: { ...cabecerasEmpresa() } });
+  const respuesta = await fetch(url, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } });
   return (await manejar(respuesta)) as { items: VencimientoItem[]; total: number };
 }
 
@@ -622,13 +623,13 @@ export async function listarCesiones(filtros: {
   if (filtros.limit) params.append("limit", String(filtros.limit));
   if (filtros.offset) params.append("offset", String(filtros.offset));
   const url = `/api/v1/cesiones${params.toString() ? `?${params.toString()}` : ""}`;
-  const respuesta = await fetch(url, { headers: { ...cabecerasEmpresa() } });
+  const respuesta = await fetch(url, { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } });
   return (await manejar(respuesta)) as { total: number; items: CesionItem[] };
 }
 
 export async function obtenerCesion(id: string): Promise<DetalleCesion> {
   const respuesta = await fetch(`/api/v1/cesiones/${id}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as DetalleCesion;
 }
@@ -651,7 +652,7 @@ export async function crearCesion(payload: {
 }> {
   const respuesta = await fetch("/api/v1/cesiones", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as {
@@ -671,7 +672,7 @@ export async function notificarCesion(
 ): Promise<{ notificacion_id: string; estado: string }> {
   const respuesta = await fetch(`/api/v1/cesiones/${id}/notificar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as { notificacion_id: string; estado: string };
@@ -683,7 +684,7 @@ export async function saldarCesion(
 ): Promise<{ estado: EstadoCesion }> {
   const respuesta = await fetch(`/api/v1/cesiones/${id}/saldar`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(payload),
   });
   return (await manejar(respuesta)) as { estado: EstadoCesion };

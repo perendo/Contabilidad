@@ -1,3 +1,4 @@
+import { getToken } from "@/services/client";
 import { cabecerasEmpresa } from "../treasury/empresa";
 
 export interface Divisa {
@@ -115,7 +116,7 @@ async function manejar(respuesta: Response): Promise<unknown> {
 
 export async function listarDivisas(): Promise<ListaDivisas> {
   const respuesta = await fetch("/api/v1/divisas", {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaDivisas;
 }
@@ -123,7 +124,7 @@ export async function listarDivisas(): Promise<ListaDivisas> {
 export async function crearDivisa(codigoIso: string): Promise<Divisa> {
   const respuesta = await fetch("/api/v1/divisas", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ codigo_iso: codigoIso }),
   });
   return (await manejar(respuesta)) as Divisa;
@@ -143,7 +144,7 @@ export async function listarTipos(
   if (filtros.fecha_lte) params.set("fecha_lte", filtros.fecha_lte);
   if (filtros.sellado !== undefined) params.set("sellado", String(filtros.sellado));
   const respuesta = await fetch(`/api/v1/tipos-cambio?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as ListaTipos;
 }
@@ -155,7 +156,7 @@ export async function crearTipo(
 ): Promise<TipoCambio> {
   const respuesta = await fetch("/api/v1/tipos-cambio", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ divisa_id: divisaId, fecha, ratio }),
   });
   return (await manejar(respuesta)) as TipoCambio;
@@ -168,7 +169,7 @@ export async function corregirTipo(
 ): Promise<TipoCambio> {
   const respuesta = await fetch(`/api/v1/tipos-cambio/${tipoId}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ ratio, motivo }),
   });
   return (await manejar(respuesta)) as TipoCambio;
@@ -177,7 +178,7 @@ export async function corregirTipo(
 export async function historialPorAsiento(asientoId: string): Promise<ListaTipos> {
   const respuesta = await fetch(
     `/api/v1/tipos-cambio/historial?asiento_id=${asientoId}`,
-    { headers: { ...cabecerasEmpresa() } }
+    { headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() } }
   );
   return (await manejar(respuesta)) as ListaTipos;
 }
@@ -192,7 +193,7 @@ export async function crearAsientoDivisa(body: {
 }): Promise<AsientoDivisa> {
   const respuesta = await fetch("/api/v1/asientos-divisa", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify(body),
   });
   return (await manejar(respuesta)) as AsientoDivisa;
@@ -200,7 +201,7 @@ export async function crearAsientoDivisa(body: {
 
 export async function detalleAsientoDivisa(asientoId: string): Promise<DetalleAsientoDivisa> {
   const respuesta = await fetch(`/api/v1/asientos-divisa/${asientoId}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as DetalleAsientoDivisa;
 }
@@ -211,7 +212,7 @@ export async function crearValoracion(
 ): Promise<ValoracionResultado> {
   const respuesta = await fetch("/api/v1/valoraciones", {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...cabecerasEmpresa() },
+    headers: { "Content-Type": "application/json", ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
     body: JSON.stringify({ ejercicio, fecha_valoracion: fechaValoracion }),
   });
   return (await manejar(respuesta)) as ValoracionResultado;
@@ -232,7 +233,7 @@ export async function listarDiferenciasCambio(
   if (filtros.ejercicio) params.set("ejercicio", String(filtros.ejercicio));
   if (filtros.divisa_id) params.set("divisa_id", filtros.divisa_id);
   const respuesta = await fetch(`/api/v1/diferencias-cambio?${params.toString()}`, {
-    headers: { ...cabecerasEmpresa() },
+    headers: { ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}), ...cabecerasEmpresa() },
   });
   return (await manejar(respuesta)) as {
     total: number;
