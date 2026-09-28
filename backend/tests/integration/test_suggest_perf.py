@@ -1,4 +1,3 @@
-import pytest
 """Tests SPEC-001 Polish (T040): suggest < 1 s p95 y árbol < 500 ms con ~10k cuentas."""
 
 from __future__ import annotations
@@ -6,6 +5,7 @@ from __future__ import annotations
 import time
 from statistics import quantiles
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.acct.account_plan import AccountPlan

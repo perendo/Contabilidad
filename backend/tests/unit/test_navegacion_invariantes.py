@@ -376,6 +376,56 @@ def test_el_guard_no_redirige_la_api() -> None:
     )
 
 
+def test_la_sesion_no_se_destruye_con_un_403_de_contexto() -> None:
+    """Un 403 de empresa no puede cerrar la sesion. Un 401, si.
+
+    El fallo que fija este test fue real y se manifeste como un bucle de
+    identificacion: el usuario tecleaba bien su contrasena y cada intento lo expulsaba
+    al login.
+
+    La causa es que `get_empresa_id` responde **403** cuando falta la cabecera
+    `X-Empresa-Activa` o cuando la empresa no le sirve al usuario, y ambas cosas son un
+    problema de contexto, no de credencial. `guardarSesion` deja la empresa a `null`
+    cuando el backend no propone ninguna por defecto, con lo que la primera peticion
+    salia sin cabecera, recibia un 403 y el proveedor limpiaba token y cookie de una
+    sesion que acababa de crear y que era valida.
+
+    El criterio que se fija es el del backend, no el del cliente: `get_current_user`
+    responde 401 para token invalido, expirado o usuario inexistente, y nada mas. Asi
+    que 401 es "la sesion no vale" y cualquier otro codigo es "no se pudo resolver el
+    contexto", que se deja resolver eligiendo empresa.
+
+    Se comprueba sobre el `catch` de la lectura del contexto porque es el unico sitio
+    que decide si la sesion sobrevive, y porque un 403 aqui no es un caso teorico: es
+    lo que pasa en el primer arranque de una empresa recien creada.
+    """
+    texto = SESION.read_text(encoding="utf-8")
+    bloque = _bloque_de_carga_del_contexto(texto)
+    assert bloque is not None, "no se encuentra el catch de la lectura del contexto"
+    # Se busca cualquier comparacion con 403 dentro del bloque que acabe en
+    # `limpiarSesion`. Comparar `status === 401` es lo correcto; anadir `|| 403` es lo
+    # que rompia la sesion.
+    destruction = re.search(r"status\s*===\s*403[^{]*\{[^}]*limpiarSesion", bloque, re.DOTALL)
+    assert destruction is None, (
+        "SessionContext vuelve a tratar un 403 como sesion invalida; un 403 de "
+        "get_empresa_id es un problema de contexto de empresa, no de credencial, y "
+        "limpiar la sesion deja al usuario en un bucle de identificacion"
+    )
+    assert re.search(r"status\s*===\s*401[^{]*\{[^}]*limpiarSesion", bloque, re.DOTALL), (
+        "un 401 de get_current_user sigue teniendo que cerrar la sesion: si no, el "
+        "token caducado deja un shell vacio en vez de volver al login"
+    )
+
+
+def _bloque_de_carga_del_contexto(texto: str) -> str | None:
+    """El `catch` de `recargar`, que es donde se decide si la sesion sobrevive."""
+    inicio = texto.find("const datos = await get<unknown>(RUTA_CONTEXTO)")
+    if inicio == -1:
+        return None
+    fin = texto.find("} finally {", inicio)
+    return texto[inicio:fin] if fin != -1 else None
+
+
 def test_la_sesion_no_acepta_una_respuesta_que_no_es_un_contexto() -> None:
     """El cliente comprueba la FORMA de la respuesta, no solo su tipo declarado.
 

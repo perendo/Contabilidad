@@ -6,7 +6,7 @@ protegen el inventario y el orden de dependencias que aplica `db.migrate`.
 
 from __future__ import annotations
 
-from db.migrate import MIGRATIONS_DIR, archivos_ordenados
+from db.migrate import MIGRATIONS_DIR, ORDEN_PREFERENTE, archivos_ordenados
 
 ESPERADAS = [
     "000_audit_log.sql",
@@ -32,12 +32,48 @@ ESPERADAS = [
     "020_export.sql",
     "021_adjuntos_asiento.sql",
     "022_favoritos.sql",
+    "023_seed_demo.sql",
 ]
 
 
 def test_migraciones_esperadas_existen():
     nombres = {p.name for p in MIGRATIONS_DIR.glob("*.sql")}
     assert set(ESPERADAS) <= nombres
+
+
+def test_el_inventario_coincide_con_orden_preferente():
+    """`ESPERADAS` y `ORDEN_PREFERENTE` son la misma lista escrita dos veces.
+
+    Se duponen porque cada una responde a una pregunta distinta y ambas tienen que
+    fallar: `ORDEN_PREFERENTE` la usa el runner de migraciones, y `ESPERADAS` la usan
+    estos tests para afirmar el contenido de ficheros concretos. Duplicarlas sin
+    sincronizarlas es exactamente lo que paso con `023_seed_demo.sql`: se anadio a
+    `db.migrate` y se olvido aqui, con lo que la suite entera se caia en la recoleccion
+    de `test_suggest_perf` por un fichero que no tiene nada que ver con las migraciones.
+
+    Se comparan aqui, y no solo en `test_orden_por_dependencias`, porque este comprueba
+    el resultado (ficheros aplicados en orden) y este comprueba que las dos declaraciones
+    no se separen. Si alguien anade una migracion y olvida una de las dos, falla aqui y
+    con un mensaje que senala la lista, no con un fallo de orden que hay que descifrar.
+    """
+    assert ESPERADAS == list(ORDEN_PREFERENTE), (
+        "el inventario del test y el orden del runner de migraciones ya no son la misma "
+        f"lista. Solo en ESPERADAS: {sorted(set(ESPERADAS) - set(ORDEN_PREFERENTE))}; "
+        f"solo en ORDEN_PREFERENTE: {sorted(set(ORDEN_PREFERENTE) - set(ESPERADAS))}"
+    )
+
+
+def test_no_hay_migraciones_fuera_del_inventario():
+    """Ningun `.sql` sin declarar.
+
+    `db.migrate` anade al final lo que no figura en `ORDEN_PREFERENTE`, en orden de
+    nombre, asi que una migracion olvidada se aplicaria en un sitio distinto del que su
+    autora pretendia, y sin que nada lo indique. Aqui solo se reclama que este declarada;
+    en que sitio va, lo decide el orden.
+    """
+    declaradas = set(ESPERADAS)
+    huerfanas = sorted(p.name for p in MIGRATIONS_DIR.glob("*.sql") if p.name not in declaradas)
+    assert huerfanas == [], f"migraciones en disco que no estan en el inventario: {huerfanas}"
 
 
 def test_orden_por_dependencias():

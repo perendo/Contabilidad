@@ -34,6 +34,7 @@ import FavoritesBar from "./FavoritesBar";
 import ResumenSuperficie from "./ResumenSuperficie";
 import {
   destinosAgrupados,
+  enlaceDeDestino,
   sinRestricciones,
   superficieDeRuta,
   superficiePorClave,
@@ -96,11 +97,18 @@ export default function SurfacePanel({
                       // se conserva en la base (FR-024), de modo que si el permiso
                       // vuelve, el favorito sigue ahi.
                       if (!concedido) return null;
-                      const esActivo = rutaActiva === destino.ruta.replace(/\/$/, "");
+                      // El enlace lo resuelve el mapa, no esta vista: un destino sin
+                      // ruta navegable devuelve `null` y no se pinta como enlace. Un
+                      // `href=""` resolveria a la URL actual, que es un enlace que no
+                      // lleva a ninguna parte con la misma pinta que los de verdad.
+                      const enlace = enlaceDeDestino(destino, superficie);
+                      if (enlace === null) return null;
+                      const esActivo =
+                        rutaActiva === destino.ruta.replace(/\/$/, "") && destino.ruta !== "";
                       return (
                         <li key={destino.clave}>
                           <Link
-                            href={destino.ruta}
+                            href={enlace}
                             aria-current={esActivo ? "page" : undefined}
                             className={[
                               "block rounded border px-3 py-2 text-sm",

@@ -129,8 +129,8 @@ async def _contabilidad(db: AsyncSession, empresa_id: int, ejercicio: int) -> di
     return {
         "metricas": metricas,
         "enlaces": [
-            _enlace("asientos", "Ver asientos", "/contabilidad/asientos"),
-            _enlace("nuevo_asiento", "Nuevo asiento", "/contabilidad/asientos/nuevo"),
+            _enlace("asientos", "Ver asientos", "/asientos/diario"),
+            _enlace("nuevo_asiento", "Nuevo asiento", "/asientos/nuevo"),
         ],
     }
 
@@ -210,8 +210,8 @@ async def _tesoreria(db: AsyncSession, empresa_id: int, ejercicio: int) -> dict:
             _metrica("vencimientos_pendientes", "Vencimientos pendientes", pendientes),
         ],
         "enlaces": [
-            _enlace("vencimientos", "Vencimientos", "/tesoreria/vencimientos"),
-            _enlace("conciliacion", "Conciliación", "/tesoreria/conciliacion"),
+            _enlace("vencimientos", "Vencimientos", "/vencimientos"),
+            _enlace("conciliacion", "Conciliación", "/conciliacion"),
         ],
     }
 
@@ -305,7 +305,7 @@ async def _maestros(db: AsyncSession, empresa_id: int, ejercicio: int) -> dict:
         "enlaces": [
             _enlace("empresas", "Empresas", "/maestros/empresas"),
             _enlace("terceros", "Terceros", "/terceros"),
-            _enlace("plan_cuentas", "Plan de cuentas", "/contabilidad/cuentas"),
+            _enlace("plan_cuentas", "Plan de cuentas", "/cuentas"),
         ],
     }
 

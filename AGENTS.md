@@ -11,6 +11,31 @@ cada sesión; el estado completo se persiste en `specs/*/` y `.specify/memory/`.
 - **Base de Datos y Migraciones**: `backend/src/db/migrate.py` incorpora tracking de versiones aplicadas en la tabla `schema_migrations`.
 - **Testing y Benchmarks**: Se añadió el marcador `@pytest.mark.benchmark` en `pytest.ini` y en `tests/integration/test_suggest_perf.py` para aislar pruebas de rendimiento de la suite de regresión.
 
+## 51-bis. Estado tras la auditoria del frontend (2026-09-28)
+
+Correccion de SPEC-031 tras detectarse que la navegacion no resolvia nada. Detalle
+completo en la seccion 51 y en `specs/031-navegacion-superficies/tasks.md`.
+
+- **Causa raiz**: `superficieDeRuta()` (`frontend/src/components/navigation/surfaces.ts`)
+  resolvia la ruta entre los **destinos** de cada superficie y nunca entre su **landing**,
+  asi que las seis landings devolvian `undefined` y el panel no pintaba ni la rejilla de
+  destinos ni el resumen. El rail se veia bien; el programa, no.
+- **Correcciones**: resolucion de la landing; `enlaceDeDestino()` + `Destino.ancla` para
+  que el ajuste de informacion fiscal deje de ser un `<Link href="">`; 5 "ir a" rotos en
+  `services/navigation/resumenes.py`; y `SessionContext` ya no destruye la sesion ante un
+  **403** de contexto de empresa (solo ante el **401** de `get_current_user`).
+- **Guard nuevo**: `backend/tests/integration/test_navegacion_resolucion.py` (21 tests)
+  **ejecuta** `surfaces.ts` con el `tsc` del proyecto + `node`. Los guards anteriores leian
+  la declaracion del mapa, no su resolucion. Node no es una dependencia nueva.
+- **Tareas T075-T084** añadidas a `specs/031-navegacion-superficies/tasks.md` (Phase 10).
+- **Preexistentes que bloquearon la suite**: `test_suggest_perf.py` tenia `import pytest`
+  antes del `from __future__` y **detenia la recoleccion entera**; y
+  `test_migrations.py::test_orden_por_dependencias` desconocia `023_seed_demo.sql`.
+  Ambos corregidos. `ruff` queda sin un solo error.
+- **Puertas**: `21 passed` el arnes nuevo, `26 passed` los invariantes, `ruff` limpio,
+  `mypy` limpio en 416 fuentes, `tsc`/ESLint/`next build` verdes con **110 paginas**.
+  Suite completa y detalle en la seccion 51.
+
 ## 1. Estado del proyecto
 
 - **Fase**: nucleo contable completo. **30 specs terminadas** (001-030) con
@@ -161,7 +186,7 @@ Cada spec tiene en su `tasks.md` una tabla **Trazabilidad FR ↔ User Story** y 
 
 ```powershell
 # Validación (desde backend/)
-..\.venv\Scripts\python.exe -m pytest                       # 2659 passed, 21 skipped; perf verde aislado
+..\.venv\Scripts\python.exe -m pytest                       # 2968 passed, 23 skipped; perf verde aislado
 ..\.venv\Scripts\python.exe -m ruff check src tests         # lint
 ..\.venv\Scripts\python.exe -m mypy -p api -p models -p services -p database -p base -p db -p main -p config   # typecheck (406 fuentes)
 ```
@@ -314,7 +339,7 @@ La verificación real de SPEC-020 detectó que, aunque las 69 tareas estaban mar
 
 ```powershell
 # Backend (desde backend/)
-..\.venv\Scripts\python.exe -m pytest                    # 2659 passed, 21 skipped (SQLite; migraciones 000-021 sobre PG)
+..\.venv\Scripts\python.exe -m pytest                    # 2968 passed, 23 skipped (SQLite; migraciones 000-021 sobre PG)
 ..\.venv\Scripts\python.exe -m ruff check src tests      # All checks passed
 ..\.venv\Scripts\python.exe -m mypy -p api -p models -p services -p database -p base -p db -p main -p config
 # Servidor
@@ -1874,7 +1899,7 @@ Trigésima spec cerrada (48/48). Total del proyecto: **1.432/1.432 tareas**.
 ## 46. Estado del proyecto tras SPEC-031
 
 - **31 specs completas** (001-031), con las puertas verificadas.
-- **1.506/1.506** tareas marcadas (1.432 de SPEC-001 a SPEC-030, mas 74 de SPEC-031).
+- **1.516/1.516** tareas marcadas (1.432 de SPEC-001 a SPEC-030, 74 de SPEC-031 y 10 de su auditoria).
 - La spec activa ya no es SPEC-030: `specs/031-navegacion-superficies`. Ver seccion 49.
 - La siguiente feature (SEG-032: seguridad, gestion de usuarios y autoria del apunte)
   esta disenada pero **no implementada**. Quedan tres huecos conocidos que alli
@@ -2051,7 +2076,13 @@ Detalle completo en el "Estado real" de `specs/030-documentos-asiento/tasks.md`.
 
 ## 49. Cierre de SPEC-031 Navegación y superficies (2026-09-28)
 
-Trigésima primera spec cerrada. Total del proyecto: **1.506/1.506 tareas**.
+Trigésima primera spec cerrada. Total del proyecto: **1.506/1.506 tareas** en el cierre;
+con la auditoría posterior (§51) son **1.516/1.516**.
+
+> **Aviso**: esta sección describe el cierre, y el cierre pasó sus propias puertas, pero
+> al día siguiente la aplicación resultó no navegable. La causa y las cinco correcciones
+> están en la §51. Lo que se leyó como "cerrado" estaba cerrado **para las puertas que
+> existen**, y ninguna de ellas comprueba que la navegación *resuelva*.
 
 - **Modelos** `models/navigation/favorito.py` (`FavoritoUsuario`: por usuario y
   empresa, `UNIQUE (empresa_id, usuario_id, destino)`, `UNIQUE (empresa_id, id)` y FK
@@ -2271,3 +2302,181 @@ suites de test.
   la API se comprueba antes de deserializarla.
 - **`gh` ausente no significa que no haya repo.** Comprobar `git remote -v`
   antes de asumir que hay que inicializar nada.
+
+## 51. Auditoria del frontend: la navegacion no resolvia nada (2026-09-28)
+
+Al abrir la aplicacion tras cerrar SPEC-031, **solo se veian los titulos de las
+secciones y no se permitia entrar en ninguno de los procesos**. El rail, la zona de
+contexto y las seis secciones estaban a la vista; detras no habia nada a donde ir.
+Ninguna de las cuatro puertas de la spec lo detecto. Detalle completo en
+`specs/031-navegacion-superficies/tasks.md`, seccion **"Auditoria del frontend"**.
+
+### El defecto de raiz: `superficieDeRuta` nunca resolvia la landing
+
+Buscaba la ruta entre los **destinos** de cada superficie y nunca entre su **landing**
+(`surfaces.ts`). Ninguna superficie declara su propia landing como destino, asi que las
+**seis landings** devolvian `undefined`. Y `undefined` en el panel significa tres cosas a
+la vez:
+
+- `grupos` queda `[]` -> la **rejilla de destinos no se pinta**: los 57 enlaces reales de
+  las seis superficies son inalcanzables desde su propia pagina de entrada.
+- `esLanding` es `false` -> **`ResumenSuperficie` no se monta**:
+  `GET /api/v1/resumenes/{superficie}` no se llamaba nunca desde la interfaz.
+- Se pinta el aviso de "no pertenece a ninguna superficie", que en las seis landings era
+  **siempre** cierto, sin ser verdad.
+
+La correccion es una linea (`coincide(s.landing, limpio) || s.destinos.some(...)`), y
+la landing se consulta **antes** que los destinos porque es la puerta de entrada de la
+superficie. El rail apunta a la landing, luego la landing tiene que ser resoluble por el
+mismo mecanismo que el resto de rutas.
+
+### Por que las puertas no lo cazaron (lo importante)
+
+| Puerta | Por que no lo vio |
+|---|---|
+| `tsc` | No hay ningun tipo implicado: devuelve `undefined` correctamente. |
+| `next build` | Comprueba que las rutas **compilan**, no que la rejilla se **pinte**. |
+| pytest con regex sobre `surfaces.ts` | Leian la **declaracion** del mapa, no su **resolucion**. Un `if` invertido dentro de una funcion pura no cambia nada de lo que un regex puede ver. |
+| quickstart R3 | Marcado como manual, y su parte automatizada solo comprueba que las cadenas `"superficieDeRuta"`, `"destinosAgrupados"` y `"ResumenSuperficie"` **aparezcan en el fichero**. Aparecer no es funcionar. |
+
+### El guard que faltaba: uno que **ejecuta** el codigo
+
+`backend/tests/integration/test_navegacion_resolucion.py` (21 tests) compila
+`surfaces.ts` con el **tsc del propio proyecto** y evalua el mapa con **node**, para que
+la prueba ejercite el resolutor real. Reimplementar `coincide` en Python habria sido
+inutil: el defecto no estaba en la comparacion, sino en que la funcion **no llegaba a
+comparar la landing**, y la copia habria pasado en verde con la pantalla rota.
+
+Node ya es dependencia dura (`next build` no corre sin el), asi que no se anade ninguna.
+Si `node` o `tsc` faltan, los tests se **omiten con motivo explicito**: es preferible
+omitir una comprobacion a aparentar que se hizo.
+
+### Los otros tres defectos de la misma auditoria
+
+- **T077 · 5 de los 13 "ir a" del resumen no llevaban a ninguna parte.** Los `enlaces` de
+  `services/navigation/resumenes.py` se escriben a mano y ninguna puerta los contrastaba
+  con el arbol de pantallas. Cuatro apuntaban a rutas inexistentes (404) y uno
+  (`/contabilidad/asientos/nuevo`) a una pagina que **si existia pero estaba fuera del
+  mapa**, con lo que abria sin rejilla ni resumen. El caso es instructivo: un guard de
+  "la ruta existe" no lo habria pillado. Corregidas y con dos guards (pantalla existente
+  + superficie) y uno de recuento.
+- **T076 · El ajuste de informacion fiscal era `<Link href="">`.** El destino
+  `ajustes-sii` tiene `ruta: ""` porque es una seccion de la landing, no una pantalla, y
+  `destinosDePanel` no filtra los ajustes: pasaba al panel con un `href` vacio, que
+  resuelve a la URL actual. Arreglado declarando el ancla **en el mapa**
+  (`Destino.ancla`) y anadiendo `enlaceDeDestino()`, que devuelve `null` y nunca `""`.
+  El `id` se pasa por prop a `AjusteSii` para que mapa y pagina no puedan separarse. El
+  invariante "un ajuste no tiene ruta" se conserva: cambia es que el panel ya no confunde
+  "sin ruta" con "enlace al vacio".
+- **T078 · Un 403 de empresa cerraba la sesion.** `SessionContext` trataba `401` y `403`
+  igual y llamaba a `limpiarSesion()`. Pero `get_empresa_id` responde **403** cuando falta
+  `X-Empresa-Activa` o la empresa no le sirve al usuario, y eso es un problema de
+  **contexto**, no de credencial. El disparador es `guardarSesion`, que deja la empresa a
+  `null` cuando no hay empresa por defecto: la primera peticion salia sin cabecera,
+  recibia 403, y se destruia una sesion recien creada. Sintoma: **bucle de
+  identificacion**. El criterio ahora lo dicta el servidor: `get_current_user` responde
+  **401** para token invalido, expirado o usuario inexistente, y nada mas.
+
+### Dos preexistentes que bloquearon la suite
+
+- **`tests/integration/test_suggest_perf.py` no se podia colectar.** Tenia
+  `import pytest` por delante del docstring y del `from __future__ import annotations`
+  (lo coloco un organizador automatico de imports), lo que es `SyntaxError` y **detenia
+  la suite entera** con `Interrupted: 1 error during collection`. Tamben era la unica
+  fuente de los 2 errores de `ruff` (F404, I001). Arreglado; `ruff` queda limpio.
+- **`test_migrations.py::test_orden_por_dependencias` no conocia `023_seed_demo.sql`**
+  (el seed de demo de §46), que si esta en `ORDEN_PREFERENTE`. La lista `ESPERADAS` y la
+  `ORDEN_PREFERENTE` son la misma lista escrita dos veces, y se separaron. Anadidos
+  `test_el_inventario_coincide_con_orden_preferente` y
+  `test_no_hay_migraciones_fuera_del_inventario`, para que la separacion falle con un
+  mensaje que senala la lista en vez de con un fallo de orden que hay que descifrar.
+
+### Un test fijaba el bug
+
+`test_navegacion_accesibilidad.py::test_la_navegacion_es_una_lista_de_enlaces` afirmaba
+literalmente `href={destino.ruta}`, o sea **fijaba la expresion que producia el enlace al
+vacio**. Arreglar el enlace rompia el test, que es la forma mas eficaz de que un arreglo
+no llegue a hacerse. Reescrito para comprobar la intencion (cada destino es un `<Link>`
+real cuyo `href` viene de la funcion que resuelve el enlace) en vez de la expresion. Un
+guard que fija la implementacion en vez de la propiedad acaba bloqueando el arreglo del
+defecto que deberia impedir.
+
+### Verificacion
+
+| Puerta | Resultado |
+|---|---|
+| `test_navegacion_resolucion.py` | **21 passed**; con A reintroducido fallan 2, con C reintroducido fallan 2 |
+| `test_navegacion_invariantes.py` | **26 passed**; con D reintroducido falla 1 |
+| `pytest` (SQLite) | **2968 passed / 23 skipped**. Antes no se podia ni colectar. Unico fallo el flaky `test_suggest_perf`, **2 passed** aislado |
+| PostgreSQL 18.6 real | migraciones 000-023 aplicadas e idempotentes; **19 passed** en `test_pg_schema.py` |
+| `tsc`, ESLint, `next build` | verdes, **110 paginas**, Middleware 34 kB; 1 warning preexistente en `ContextZone` |
+| mypy | limpio en **416 fuentes** |
+| `ruff check src tests` | **All checks passed** (los 2 errores preexistentes de `test_suggest_perf.py` tambien corregidos) |
+
+Los cuatro guards nuevos se **comprobaron reintroduciendo su defecto** uno a uno. Un guard
+que no se ha visto fallar nunca no es un guard, es un comentario.
+
+### Lo que sigue sin comprobarse a mano
+
+R3 y R6 del quickstart, la mitad visual. El arnes comprueba que la **resolucion** es
+correcta, no que la rejilla se **pinte** en un navegador: abrir `/contabilidad` y mirar
+sigue siendo la comprobacion honesta. Lo que se ha ganado es que, si vuelve a romperse, la
+suite lo dira antes de que haya que abrir la aplicacion.
+
+### Lecciones reutilizables
+
+- **Un guard que lee la declaracion no vigila el comportamiento.** Es la cuarta vez que
+  sale en este repo, y la primera en que era el unico mecanismo. Un `if` invertido en una
+  funcion pura es invisible a un regex, y un regex es todo lo que habia.
+- **`tsc` y `next build` no se paran en el mismo sitio que el usuario.** Compilar bien
+  una pantalla que no pinta nada es un exito de las dos. Un 404 tambien.
+- **La entrada a una superficie es un caso que hay que probar como tal.** El mapa tenia 6
+  superficies y 101 destinos, y los tests cubrian los 101. El camino de "se entra por el
+  rail" -el mas usado de todos- no era ninguno de los dos.
+- **Un enlace sin destino no se ve en el codigo ni en las puertas.** `<Link href="">`
+  compila, pasa `tsc`, pasa ESLint y pasa `next build`. Solo se ve pulsandolo, y solo se
+  nota por contraste: junto a enlaces que funcionan, uno que no lleva a ninguna parte
+  parece uno que funciona.
+- **El sintoma "solo veo los titulos" describe un fallo de resolucion, no de render.** Se
+  fue a mirar el render primero, y el render estaba bien. La pista estaba en el parrafo de
+  aviso, que decia una cosa distinta de la que se veia: el panel **sabia** que no tenia
+  superficie y lo decia. Ese parrafo era el diagnostico.
+- **El codigo de estado que decide si una sesion sobrevive lo dicta el servidor, no el
+  cliente.** 403 y 401 no son el mismo error, y tractarlos igual borra credenciales por un
+  problema de contexto, sin recuperacion posible.
+- **Un guard puede fijar el bug.** Cuando una asercion comprueba la expresion literal en
+  vez de la propiedad, arreglar el defecto rompe el test. Hay que preguntar que se queria
+  comprobar, no que se escribio.
+- **Un `next build` de verificacion pisa el `.next` del `next dev` que esta en marcha.**
+  Ocurrio en esta misma sesion: se ejecuto `next build` como puerta de cierre mientras el
+  servidor de desarrollo estaba levantado, y al abrir la aplicacion el login dejo de
+  pasar. **No se lanzan las dos puertas pesadas a la vez**, ni `next build` con un
+  `next dev` vivo: las dos escriben en el mismo directorio. La suite de pytest tarda
+  ~25 min y `next build` ~1, y lanzarlos juntos congela la sesion; ademas el de pytest
+  ya va en segundo plano con log, que es la forma de no quedarse esperando el pipe.
+
+### El login: por que "no pasa" casi siempre es el backend
+
+Tras la correccion, el sintoma cambio a "no se puede entrar". La causa no era el codigo:
+el **backend no estaba levantado** (puerto 8000 libre). El login hace
+`POST /api/v1/auth/login`, que `next.config.mjs` reescribe contra
+`http://localhost:8000`; sin backend, la pantalla de identificacion se pinta perfecta y el
+envio falla con "Error de conexion". El sintoma es indistinguible de "credenciales
+mal escritas", y por eso conviene el orden de comprobacion del README.
+
+Dos detalles que costaron tiempo y conviene no volver a perder:
+
+- **`uvicorn` exige `PYTHONPATH=src`.** La aplicacion esta en `backend/src/main.py`, no en
+  la raiz del paquete. Sin la variable, uvicorn responde `Error loading ASGI app. Could not
+  import module "main"`, que parece un fallo de configuracion y es solo la variable.
+- **Sobraban dos `next dev`** compitiendo por el 3000 (iniciados a las 20:57 y a las
+  21:11), probablemente de reinicios anteriores. El segundo falla al tomar el puerto o
+  sirve un `.next` a medio construir. Un reinicio lo resuelve, y es la primera respuesta
+  cuando la aplicacion va mal sin que se haya tocado codigo.
+
+Comprobacion de estado, la que mas veces salva tiempo:
+
+```powershell
+foreach($p in 3000,8000){ if(Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue){ "$p escuchando" } else { "$p LIBRE" } }
+Get-Process node,python -ErrorAction SilentlyContinue | Select-Object Id,StartTime
+```

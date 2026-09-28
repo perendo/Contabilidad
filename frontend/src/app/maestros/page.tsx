@@ -19,6 +19,11 @@
  * El ajuste de SII (T071, FR-029) es la **única** excepción: vive aquí como sección y
  * no tiene ruta propia, porque son tres campos y no un destino de trabajo. Ver
  * `AjusteSii` para por qué no es un destino más.
+ *
+ * El `id` lo declara el mapa de superficies (`Destino.ancla`), no esta página, y por
+ * eso se pasa en vez de estar escrito aquí: el enlace del panel se compone como
+ * `/maestros#ajustes-sii`, y si el ancla viviera solo en un lado, cambiarla en el otro
+ * dejaría un enlace que no lleva a ninguna parte sin que nada fallara.
  */
 
 import AjusteSii from "@/components/navigation/AjusteSii";
@@ -33,7 +38,7 @@ export default function MaestrosPage() {
           aplicación.
         </p>
       </section>
-      <AjusteSii />
+      <AjusteSii id="ajustes-sii" />
     </div>
   );
 }

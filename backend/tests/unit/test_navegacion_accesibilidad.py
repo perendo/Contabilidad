@@ -145,11 +145,29 @@ def test_la_navegacion_es_una_lista_de_enlaces() -> None:
     Es lo que permite abrir una superficie en otra pestaña, copiarla y que funcione el
     botón atrás del navegador. Un `onClick` con `router.push` funciona hasta que alguien
     usa el botón atrás, y entonces el usuario pierde su sitio.
+
+    **Por qué se cambió la aserción (2026-09-28).** Este test afirmaba literalmente
+    `href={destino.ruta}`, o sea fijaba la expresión exacta con la que se pintaba cada
+    destino. Y esa expresión era el defecto: para un ajuste, que no tiene ruta, produce
+    `<Link href="">`, que resuelve a la URL actual, o sea un enlace que no lleva a
+    ninguna parte con la misma pinta que los de verdad. Arreglar el enlace rompería este
+    test, que es la forma más eficaz de que un arreglo no llegue a hacerse.
+
+    La propiedad que se quiere conservar no es la expresión, es el resultado: **cada
+    destino es un `<Link>` real cuyo `href` viene de la función que resuelve el enlace**.
+    Se comprueba lo segundo, y se comprueba además que no se ha vuelto a la ruta en crudo.
     """
     panel = _texto("SurfacePanel.tsx")
     assert "<Link" in panel
-    assert 'href={destino.ruta}' in panel or "href={destino.ruta}" in panel.replace(" ", "")
+    assert "enlaceDeDestino" in panel, (
+        "el panel deberia resolver el enlace con la funcion del mapa, no con la ruta en crudo"
+    )
     assert "router.push" not in panel, "navegar con onClick rompe el boton atras"
+    # Un `<Link>` sin `href` no navega; uno con `href=""` tampoco. Se comprueba que el
+    # atributo se alimenta de la variable resuelta y no de la ruta del destino.
+    assert "href={enlace}" in panel, (
+        "el href del panel deberia venir del enlace resuelto, no de destino.ruta"
+    )
 
 
 def test_los_grupos_de_destinos_tienen_encabezado() -> None:

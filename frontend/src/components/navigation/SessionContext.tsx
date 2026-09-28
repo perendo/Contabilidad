@@ -154,8 +154,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       // Un 401 aqui significa que la sesion no vale. Se limpia y el `SessionGuard`
       // manda a la pantalla de identificacion en vez de dejar un shell vacio.
+      //
+      // Un 403 NO es lo mismo, y borrarlo aqui destruia la sesion de un usuario que
+      // acababa de identificarse. `get_empresa_id` responde 403 cuando falta la
+      // cabecera `X-Empresa-Activa` o cuando la empresa no le sirve al usuario, y las
+      // dos cosas son un problema de **contexto**, no de credencial: el token sigue
+      // valiendo. El caso real es `guardarSesion`, que deja la empresa a `null` cuando
+      // el backend no propone ninguna por defecto, con lo que la primera peticion
+      // salia sin cabecera, recibia 403 y se cerraba la sesion recien creada. El
+      // sintoma era un bucle de identificacion en el que el usuario tecleaba bien su
+      // contrasena y cada intento lo expulsaba.
+      //
+      // Asi que el 403 se conserva la sesion y se deja que la zona de contexto ofrezca
+      // elegir empresa. Perder la sesion es irreversible desde aqui; equivocarse de
+      // empresa, no.
       const status = (e as { status?: number }).status;
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         limpiarSesion();
       }
       setError(e instanceof Error ? e.message : "No se pudo leer el contexto");

@@ -308,3 +308,46 @@ Reparto:
 **Lo que no se ha automatizado y hay que mirar a mano**: el recorrido R4 entero, porque
 crea asientos, y la mitad visual de todos los demás. La suite de tests no sustituye a esa
 revisión, y dar por validado R1-R10 solo con tests sería falso.
+
+---
+
+## Enmienda 2026-09-28 · por qué R3 y R6 no se habían automatizado de verdad
+
+Al abrir la aplicación después del cierre, las seis landings estaban vacías: se veían los
+títulos de las secciones y no se podía entrar en ningún proceso. El rail se veía
+perfecto, y ninguna de las cuatro puertas de la spec lo detectó.
+
+La tabla de arriba dice, para **R3**, que lo automatizado es «las seis superficies, su
+orden fijo, y que cada una tenga landing». Eso era lo que se comprobaba: que el mapa
+**declarara** seis superficies y que cada una declarara una landing. Lo que **no** se
+comprobaba es que la aplicación supiera *abrir* esa landing, y no la sabía:
+`superficieDeRuta()` buscaba la ruta entre los destinos de cada superficie y nunca entre
+su landing, así que las seis devolvían «no hay superficie» y el panel no pintaba ni la
+rejilla de destinos ni el resumen. La misma línea de la tabla de arriba, para **R6**,
+decía «que cada una muestre su lista de destinos sin huecos», y se comprobaba que las
+siete pantallas existieran en disco.
+
+La lección es sobre la palabra «automatizado» en esa tabla, y conviene tenerla presente al
+leer cualquier fila: **una prueba de que algo está declarado no es una prueba de que
+funciona**. Aquí las dos cosas se confundieron porque ambas se escriben mirando el mismo
+fichero, `surfaces.ts`, y una regex no distingue «el mapa dice 6 superficies» de «la
+aplicación resuelve 6 superficies».
+
+### Qué se ha automatizado desde entonces
+
+`backend/tests/integration/test_navegacion_resolucion.py` compila `surfaces.ts` con el
+`tsc` del propio proyecto y lo evalúa con `node`, de modo que la prueba **ejecuta** el
+resolutor en vez de leer su declaración. Con ello, la mitad decicional de R3 y R6 —qué
+ruta pertenece a qué superficie, y a dónde lleva cada enlace— pasa a ser verificable, y
+era justo la mitad que estaba rota.
+
+Lo que **sigue** sin automatizarse, y hay que mirar por la misma razón que antes:
+
+| Recorrido | Lo que ahora se comprueba | Lo que sigue siendo a ojo |
+|---|---|---|
+| **R3** | Que la landing de cada superficie resuelve a esa superficie, con barra final y con query; que cada destino resuelve a la que lo declara; que ninguna ruta se declara en dos superficies | Que la rejilla se **pinte**, que el indicador activo sea único y que no se recorte ninguna etiqueta |
+| **R6** | Que los «ir a» del resumen apuntan a una pantalla que existe **y** a una superficie; que el ancla de cada ajuste existe en su página | Que el resumen muestre cifras, y que los enlaces funcionen al pulsarlos |
+
+La comprobación de R3 y R6 más honesta que hay ahora es la de siempre y sigue siendo
+manual: **abrir `/contabilidad` y mirar**. Lo que ha cambiado es que, si la navegación
+vuelve a romperse, la suite lo dirá antes de que haya que abrirla.

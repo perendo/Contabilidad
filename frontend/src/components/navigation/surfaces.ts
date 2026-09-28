@@ -61,6 +61,17 @@ export interface Destino {
   hijo?: boolean;
   /** Ajuste dentro del panel, sin pantalla propia. */
   ajuste?: boolean;
+  /**
+   * `id` de la seccion donde vive el ajuste, dentro de la landing de su superficie.
+   *
+   * Un ajuste no tiene ruta porque no es una pantalla: es una seccion de la pagina de
+   * entrada. Se declara el `id` aqui, y no en el componente, para que el mapa y la
+   * pagina no puedan separarse: si el `id` viviera solo en el componente, cambiarlo
+   * alli dejaria el enlace del panel apuntando a un ancla inexistente sin que nada
+   * fallara. Un `href` sin ancla resolveria a la propia pagina, o sea un enlace
+   * que no lleva a ninguna parte presentado como si fuera un destino mas.
+   */
+  ancla?: string;
 }
 
 export interface Superficie {
@@ -246,7 +257,10 @@ export const SUPERFICIES: readonly Superficie[] = [
       d("exportaciones", "Exportación integral", "/exportaciones"),
       d("exportaciones-nueva", "Nueva exportación", "/exportaciones/nueva", ACCION),
       d("exportaciones-detalle", "Detalle de exportación", "/exportaciones/[id]", HIJO),
-      d("ajustes-sii", "Ajustes de información fiscal", "", { ajuste: true }),
+      d("ajustes-sii", "Ajustes de información fiscal", "", {
+        ajuste: true,
+        ancla: "ajustes-sii",
+      }),
     ],
   },
 ] as const;
@@ -299,7 +313,34 @@ export function destinosAgrupados(
 export function superficieDeRuta(ruta: string): Superficie | undefined {
   const limpio = ruta.split("?")[0].replace(/\/$/, "") || "/";
   if (EXCEPCIONES_GUARD.includes(limpio)) return undefined;
-  return SUPERFICIES.find((s) => s.destinos.some((x) => coincide(x.ruta, limpio)));
+  // La landing se consulta ANTES que los destinos, y no es un detalle de orden: una
+  // superficie es duena de su propia pagina de entrada. Si solo se miraran los
+  // destinos, entrar por el rail -que apunta a la landing- devolveria `undefined` y el
+  // panel se quedaria sin rejilla ni resumen, dejando la pantalla en el unico titulo
+  // que trae la pagina. El rail se veria perfecto y el programa, no.
+  return SUPERFICIES.find(
+    (s) =>
+      coincide(s.landing, limpio) || s.destinos.some((x) => coincide(x.ruta, limpio)),
+  );
+}
+
+/**
+ * La URL a la que lleva un destino del panel, o `null` si no lleva a ninguna.
+ *
+ * Un ajuste no tiene ruta: vive como seccion dentro de la landing de su superficie, y
+ * se enlaza con un ancla. Devolver `null` en vez de `""` es lo que evita el
+ * `<Link href="">`, que resuelve a la URL actual y deja un enlace que no lleva a
+ * ningun sitio presentada con la misma pinta que los de verdad.
+ */
+export function enlaceDeDestino(
+  destino: Destino,
+  superficie: Superficie,
+): string | null {
+  if (destino.ajuste) {
+    const ancla = destino.ancla ?? destino.clave;
+    return `${superficie.landing}#${ancla}`;
+  }
+  return destino.ruta.trim() === "" ? null : destino.ruta;
 }
 
 /** El destino activo para una ruta concreta. */

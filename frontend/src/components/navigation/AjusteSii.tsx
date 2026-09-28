@@ -34,7 +34,7 @@ interface ConfigSii {
   periodicidad_303: string;
 }
 
-export default function AjusteSii() {
+export default function AjusteSii({ id = "ajustes-sii" }: { id?: string }) {
   const [config, setConfig] = useState<ConfigSii | null>(null);
   const [error, setError] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -84,8 +84,12 @@ export default function AjusteSii() {
   };
 
   return (
-    <section aria-labelledby="ajuste-sii" className="rounded-lg border border-slate-200 bg-white p-4">
-      <h2 id="ajuste-sii" className="text-sm font-semibold text-slate-900">
+    <section
+      aria-labelledby={`${id}-titulo`}
+      id={id}
+      className="rounded-lg border border-slate-200 bg-white p-4"
+    >
+      <h2 id={`${id}-titulo`} className="text-sm font-semibold text-slate-900">
         Información fiscal electrónica (SII)
       </h2>
 

@@ -158,7 +158,16 @@ Toda pantalla existente aparece exactamente una vez.
 | `exportaciones` | Exportación integral | `/exportaciones` |
 | `exportaciones-nueva` | Nueva exportación | `/exportaciones/nueva` *(acción)* |
 | `exportaciones-detalle` | Detalle de exportación | `/exportaciones/[id]` *(hijo)* |
-| `ajustes-sii` | Ajustes de información fiscal | *(ajuste en el panel, no ruta propia)* |
+| `ajustes-sii` | Ajustes de información fiscal | *(ajuste en el panel: `/maestros#ajustes-sii`)* |
+
+> **Enmienda 2026-09-28**: la fila de arriba decía «ajuste en el panel, no ruta propia» y
+> no decía **dónde** estaba. El panel la renderizaba como `<Link href="">`, que resuelve a
+> la URL actual: un enlace que no lleva a ninguna parte, con la misma pinta que los de
+> verdad. El ajuste **no tiene ruta** (sigue siendo una sección, no una pantalla), pero
+> tiene **ancla**, y el ancla se declara en el mapa como `Destino.ancla`, no en el
+> componente. El panel compone `{landing}#{ancla}` mediante `enlaceDeDestino()`, que
+> devuelve `null` —nunca `""`— cuando no hay destino navegable, de modo que una entrada
+> sin ruta no pueda salir como enlace. Ver la sección 7.
 
 **Recuento**: 103 pantallas. Las 5 páginas de landing nuevas y `/maestros/empresas` suman
 pantallas nuevas; las 5 rutas antiguas se convierten en redirect y dejan de contar como
@@ -170,6 +179,33 @@ pantalla; `/` (raíz) se sustituye por la landing de Contabilidad.
 > son exactamente las 6 previstas: 5 landings más `/maestros/empresas`. Un mapa de 103
 > elementos escrito a mano sin contraste previo contiene huecos; por eso el guard de §6 es
 > obligatorio y no opcional.
+
+---
+
+## 2bis · La landing es resoluble (enmienda 2026-09-28)
+
+Este requisito **no estaba en el contrato** y su ausencia es la causa de que la
+aplicación se abriera vacía.
+
+La **landing de una superficie es su puerta de entrada**: es a donde apunta el rail, es la
+primera pantalla que ve el usuario de cada superficie, y es la única que monta el resumen.
+Por tanto la función que resuelve «qué superficie corresponde a esta ruta»
+(`superficieDeRuta`) tiene que considerar la landing **además** de los destinos.
+
+Si solo considera los destinos, y ninguna superficie declara su propia landing como
+destino, las seis landings devuelven `undefined`. Y `undefined` en el panel significa tres
+cosas a la vez, todas rotten:
+
+| Consecuencia | Efecto visible |
+|---|---|
+| `grupos` queda vacío | la rejilla de destinos no se pinta: los 57 enlaces reales son inalcanzables desde su propia página de entrada |
+| `esLanding` es `false` | `ResumenSuperficie` no se monta: `GET /api/v1/resumenes/{superficie}` no se llama nunca |
+| el aviso de «no pertenece a ninguna superficie» | se pinta en las seis landings, siempre, sin ser verdad |
+
+El contrato que se añade: **toda ruta que una superficie declara, incluida su `landing`,
+resuelve a esa superficie**. Y su contraparte, que también hay que escribir: **ninguna ruta
+se declara en dos superficies**, porque añadir la landing a la búsqueda crea la posibilidad
+de solape.
 
 ---
 
@@ -225,3 +261,42 @@ patrón que `test_guard_siembra_empresa.py` (SPEC-031 research, AGENTS.md §47).
 
 **Excepciones explícitas** (y solo estas): `/login`, `/` (raíz) y los 5 archivos de redirect.
 Si la lista crece, la lista envejece y el guard deja de ser una red.
+
+---
+
+## 7. Guard de resolución (enmienda 2026-09-28)
+
+El guard de §6 y el resto de tests de la feature leen `surfaces.ts` con expresiones
+regulares. Comprueban que el mapa **declare** lo correcto, no que la aplicación
+**resuelva** lo correcto. Las cuatro puertas que la spec acepta como sustituto de un test
+de frontend (`tsc`, ESLint, `next build`, pytest) pasan con la navegación rota: un `if`
+invertido dentro de una función pura no cambia nada de lo que un regex puede ver.
+
+Falta por tanto una categoría de guard que el proyecto no tenía: uno que **ejecute** el
+código. `test_navegacion_resolucion.py` (21 tests) compila `surfaces.ts` con el `tsc` del
+propio proyecto y evalúa el mapa con `node`, de modo que la prueba ejercita el resolutor
+real.
+
+Reimplementar la lógica en Python **no serviría**: el defecto no estaba en la comparación,
+sino en que la función no llegaba a comparar la landing. La copia habría pasado en verde
+con la pantalla rota.
+
+Cubre, como mínimo:
+
+| # | Comprobación |
+|---|---|
+| 1 | La landing de cada superficie resuelve a esa superficie, con barra final y con query |
+| 2 | Cada destino del panel resuelve a la superficie que lo declara, y no a otra |
+| 3 | Ninguna ruta se declara en dos superficies |
+| 4 | Las pantallas de detalle resuelven por su patrón `[id]` |
+| 5 | Ninguna entrada del panel produce un enlace vacío, y el panel usa la función que resuelve el enlace |
+| 6 | El ancla de cada ajuste existe como `id` en la página donde se monta |
+| 7 | Cada «ir a» del resumen apunta a una pantalla real **y** resuelve a una superficie |
+| 8 | La forma del mapa no ha cambiado: 6 superficies, rail de 6, grupos, y las claves coinciden con `DESTINOS` del backend |
+
+`node` ya es dependencia dura (`next build` no corre sin él), así que no se añade ninguna.
+Si `node` o `tsc` no están, los tests se **omiten con motivo explícito**: es preferible
+omitir una comprobación a aparentar que se hizo.
+
+**Regla para la lista de guards**: todo guard se comprueba **reintroduciendo su
+defecto**. Un guard que no se ha visto fallar nunca no es un guard, es un comentario.

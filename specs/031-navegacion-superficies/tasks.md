@@ -247,6 +247,26 @@ activo y que cambia al cambiar de ejercicio.
 - [X] T068 [P] Revisar los 40 ítems de `checklists/navegacion.md` y documentar en el `tasks.md` cuáles quedan `[x]` y cuáles siguen abiertos, con el motivo
 - [X] T069 Medir el p95 de `GET /api/v1/contexto` con 5.000 asientos repartidos en dos ejercicios sobre PostgreSQL 18.6 real, comprobar que cumple el presupuesto de 300 ms del plan y el SC-013, y documentar el resultado en `backend/tests/integration/test_contexto_performance.py`
 
+## Phase 10: Auditoria del frontend (2026-09-28) · T075-T084
+
+La feature se cerro con las seis puertas en verde y, al abrirla al dia siguiente, las
+seis landings estaban vacias: se veian los titulos de las secciones y no se podia entrar
+en ningun proceso. Ninguna de las cuatro puertas de la spec lo detecto, porque ninguna
+comprueba que la aplicacion **resuelva** el mapa, solo que lo **declare** bien. El
+detalle del diagnostico, de los cuatro defectos y de los seis guards esta en la seccion
+**"Auditoria del frontend"** al final de este fichero.
+
+- [X] T075 Reproducir el fallo antes de tocar nada: test comportamental en `backend/tests/integration/test_navegacion_resolucion.py` que compila `surfaces.ts` con el tsc del proyecto y evalua el mapa con node, en vez de reimplementar la logica en Python
+- [X] T076 Corregir la resolucion de superficies: `superficieDeRuta` tiene que comparar tambien la `landing` de cada superficie, no solo sus destinos, en `frontend/src/components/navigation/surfaces.ts`
+- [X] T077 Corregir el enlace al vacio del ajuste: declarar `Destino.ancla` en el mapa, anadir `enlaceDeDestino()` que devuelve `null` en vez de `""`, y que `SurfacePanel` y `AjusteSii` usen el ancla declarada en el mapa
+- [X] T078 Corregir los cinco "ir a" muertos de `backend/src/services/navigation/resumenes.py` y las cinco rutas canonicas a las que apuntan
+- [X] T079 Corregir `SessionContext` para que un 403 de contexto de empresa no destruya la sesion, reservando `limpiarSesion()` para el 401 de `get_current_user`
+- [X] T080 Guard: ningun destino del panel produce un `href` vacio, y el panel usa `enlaceDeDestino` y no la ruta en crudo
+- [X] T081 Guard: cada "ir a" del resumen apunta a una pantalla que existe **y** resuelve a una superficie, mas un guard de recuento para que los dos anteriores no puedan pasar con cero enlaces
+- [X] T082 Guard: el ancla de cada ajuste existe como `id` en la pagina donde se monta
+- [X] T083 Guard: un 403 de contexto no cierra la sesion y un 401 si, en `backend/tests/unit/test_navegacion_invariantes.py`
+- [X] T084 Verificar que **cada guard muerde** reintroduciendo su defecto una a una, y ejecutar las puertas: pytest de los dos ficheros, `tsc`, ESLint, `next build`, mypy y ruff
+
 ---
 
 ## Dependencies & Execution Order
@@ -671,3 +691,228 @@ repetido al cerrar: el principio I (partida doble) y el II (inmutabilidad de
 asientos) los cumple el codigo de SPEC-002, que esta feature no toca, y
 `test_constitucion_navegacion.py` comprueba lo que si es de esta feature
 (aislamiento, `Decimal`, auditoria de escritura, ACID, control de acceso).
+
+## Auditoria del frontend (2026-09-28, T075-T084) · la navegacion no funcionaba
+
+La feature se cerro el 2026-09-28 con las seis puertas en verde. Al abrir la aplicacion
+al dia siguiente, **solo se veian los titulos de las secciones y no se podia entrar en
+ningun proceso**. El rail, la zona de contexto y las seis secciones estaban a la vista;
+detras no habia nada a donde ir.
+
+No es un fallo de una pantalla. Las **seis** landings -las unicas pantallas por las que
+se entra a una superficie- estaban vacias de contenido util, y ademas con el aviso de
+"Esta pantalla no pertenece a ninguna superficie". El mapa de superficies declaraba las
+6 superficies y sus 101 destinos; el programa no resolvia ni una.
+
+### El defecto de raiz
+
+`superficieDeRuta()` buscaba la ruta entre los **destinos** de cada superficie y nunca
+entre su **landing**:
+
+```ts
+// ANTES, surfaces.ts:299-303
+return SUPERFICIES.find((s) => s.destinos.some((x) => coincide(x.ruta, limpio)));
+```
+
+Ninguna superficie declara su propia landing como destino, asi que las seis devolvian
+`undefined`. Y `undefined` en el panel significa tres cosas a la vez:
+
+- `grupos` queda `[]`, asi que **la rejilla de destinos no se pinta**: los 57 enlaces
+  reales de las seis superficies son inalcanzables desde su propia pagina de entrada.
+- `esLanding` queda `false`, asi que **`ResumenSuperficie` no se monta**:
+  `GET /api/v1/resumenes/{superficie}` no se llegaba a llamar nunca desde la interfaz.
+- Se pinta el parrafo de "no pertenece a ninguna superficie", que en las seis landings
+  era **siempre** cierto, sin ser verdad.
+
+La correccion es una linea, y la razon de que no se detectara no cabe en la linea:
+
+```ts
+// DESPUES, surfaces.ts:299-311
+return SUPERFICIES.find(
+  (s) =>
+    coincide(s.landing, limpio) || s.destinos.some((x) => coincide(x.ruta, limpio)),
+);
+```
+
+El rail apunta a la landing, luego **la landing es la puerta de entrada de la
+superficie**, y tiene que ser resoluble por el mismo mecanismo que el resto de rutas.
+
+### Por que las puertas de la spec no lo cazaron
+
+Esta es la parte importante, y es una leccion sobre el metodo, no sobre el codigo.
+
+La spec sustituyo el test de frontend (que el proyecto no tiene: `package.json` no trae
+runner) por cuatro puertas: `tsc`, ESLint, `next build` y tests de **pytest que leen
+`surfaces.ts` con expresiones regulares**. Las cuatro pasan con la navegacion rota:
+
+| Puerta | Por que no lo vio |
+|---|---|
+| `tsc` | No hay ningun tipo implicado. `superficieDeRuta` devuelve `Superficie \\| undefined` y devuelve `undefined` correctamente. |
+| `next build` | Comprueba que las rutas **compilan**, no que la rejilla se **pinte**. Las seis landings compilan y se sirven. |
+| pytest con regex | Un `if` invertido dentro de una funcion no cambia la forma del array `SUPERFICIES` que esos tests parsean. Leen la **declaracion**, no la **resolucion**. |
+| El propio quickstart | R3 ("las seis secciones, cada una con su lista de opciones") estaba marcado como **manual**, y la suite automatizada de R3 solo comprueba que las cadenas `"superficieDeRuta"`, `"destinosAgrupados"` y `"ResumenSuperficie"` **aparezcan en el fichero**. Aparecer es no ser lo mismo que funcionar. |
+
+El patron ya conocido en este repo, ampliado: `tsc` no valida un contrato, `next build`
+no comprueba que las rutas existan, y **un guard que lee prosa comprueba que la prosa
+este**. Faltaba una cuarta categoria: un guard que **ejecuta** el codigo.
+
+### Lo que se anadio: T075, un arnes que ejecuta el mapa
+
+`backend/tests/integration/test_navegacion_resolucion.py` (21 tests) compila
+`surfaces.ts` con el **tsc del propio proyecto** y evalua el mapa con **node**, para que
+la prueba ejercite el codigo real en vez de una reimplementacion en Python.
+Reimplementar `coincide` en Python habria sido inútil: el defecto no estaba en la
+comparacion, sino en que la funcion **no llegaba a comparar la landing**, y la copia
+habria pasado en verde con la pantalla rota.
+
+Node ya es dependencia dura (`next build` no corre sin el), asi que no se anade ninguna.
+Si `node` o `tsc` faltan, los tests se **omiten con motivo explicito**: es preferible
+omitir una comprobacion a aparentar que se hizo.
+
+Lo que cubre, que es la lista de lo que la spec prometo y nadie comprobaba:
+
+- La landing de cada superficie resuelve a esa superficie, con barra final y con query.
+- Cada destino del panel resuelve a la superficie que lo declara, y **no a otra**: anadir
+  la landing a la busqueda crea la posibilidad de solape, y se deja escrito el criterio.
+- Las pantallas de detalle (`/asientos/<uuid>`) resuelven por su patron `[id]`.
+- Ninguna ruta se declara en dos superficies.
+- Ninguna entrada del panel produce un enlace vacio, y el panel usa la funcion que
+  resuelve el enlace (un guard sobre la funcion nueva no vigia que la usen).
+- La **forma** del mapa no ha cambiado: 6 superficies, rail de 6, grupos de Tesoreria, y
+  las claves de destino coinciden con el catalogo `DESTINOS` del backend.
+
+### T076-T078 · Los otros tres defectos que salieron de la misma auditoria
+
+**T076 - El ajuste de informacion fiscal era un enlace al vacio.** El destino
+`ajustes-sii` se declara con `ruta: ""` y `ajuste: true`, porque es una seccion de la
+landing de Maestros y no una pantalla. `destinosDePanel` filtra `accion` e `hijo` pero
+**no** `ajuste`, asi que pasaba al panel y se renderizaba como `<Link href="">Ajustes de
+informacion fiscal</Link>`. Un `href` vacio resuelve a la URL actual: un enlace que no
+lleva a ninguna parte, con la misma pinta que los de verdad. Ademas el ancla que montaba
+`AjusteSii` se llamaba `ajuste-sii` y la clave del mapa es `ajustes-sii`, de modo que el
+ancla tampoco cuadraba: aunque se hubiera implementado el enlace, habria apuntado a un
+sitio que no existe.
+
+El arreglo no es "quitarlo del panel", porque eso habria silenciado FR-029 en silencio.
+Es declarar el ancla **en el mapa** (`Destino.ancla`) y que el panel componga
+`{landing}#{ancla}`, con `enlaceDeDestino()` devolviendo `null` en vez de `""` para que
+un destino sin ruta no se renderice como enlace. El `id` lo recibe `AjusteSii` por prop,
+de modo que mapa y pagina no pueden separarse. El invariante de que un ajuste no tiene
+ruta se conserva: `ruta` sigue a `""`, lo que cambia es que el panel deja de confundir
+"sin ruta" con "enlace al vacio".
+
+**T077 - Cinco de los trece "ir a" del resumen no llevaban a ninguna parte.** Los
+`enlaces` de `services/navigation/resumenes.py` se escriben a mano y **ninguna puerta los
+contrastaba con el arbol de pantallas del frontend**:
+
+| Enlace | Ruta que tenia | Realidad |
+|---|---|---|
+| Ver asientos | `/contabilidad/asientos` | 404 (la real es `/asientos/diario`) |
+| Nuevo asiento | `/contabilidad/asientos/nuevo` | la pagina existe pero **fuera del mapa**: abria sin rejilla ni resumen |
+| Vencimientos | `/tesoreria/vencimientos` | 404 (la real es `/vencimientos`) |
+| Conciliación | `/tesoreria/conciliacion` | 404 (la real es `/conciliacion`) |
+| Plan de cuentas | `/contabilidad/cuentas` | 404 (la real es `/cuentas`) |
+
+El caso de "Nuevo asiento" es el instructive: un guard de "la ruta existe" **no** lo
+habria pillado, porque la pagina existe. Cae por el segundo guard, el que exige que la
+ruta resuelva a alguna superficie. El resumen es lo que convierte una landing en util,
+asi que un "ir a" roto se nota en la primera pantalla que se abre. Corregidas las cinco
+rutas y anadidos dos guards (pantalla existente + superficie) y uno de recuento, para
+que los dos anteriores no puedan pasar con cero enlaces.
+
+**T078 - Un 403 de empresa cerraba la sesion.** `SessionContext` trataba `401` y `403`
+igual y llamaba a `limpiarSesion()` en los dos casos, borrando token y cookie. Pero
+`get_empresa_id` responde **403** cuando falta `X-Empresa-Activa` o cuando la empresa no
+le sirve al usuario, y ambas son un problema de **contexto**, no de credencial: el token
+sigue valiendo. El disparador real es `guardarSesion`, que deja la empresa a `null`
+cuando el backend no propone ninguna por defecto; la primera peticion salia sin cabecera,
+recibia un 403, y se destruia una sesion recien creada. El sintoma era un **bucle de
+identificacion**: el usuario tecleaba bien su contrasena y cada intento lo expulsaba.
+
+El criterio se fija en el del backend, que es el que manda: `get_current_user` responde
+**401** para token invalido, expirado o usuario inexistente, y nada mas. Asi que `401` es
+"la sesion no vale" y cualquier otro codigo es "no se pudo resolver el contexto", que se
+deja resolver eligiendo empresa en la zona de contexto. Perder la sesion es irreversible
+desde ahi; equivocarse de empresa, no.
+
+### T079-T084 · Lo que se dejo escrito como Red
+
+Cinco correcciones de codigo con un solo defecto de raiz no salen de ahi: salen de que
+faltaba una comprobacion. Cada una lleva la suya, y todas estan en el arnes o en el
+fichero de invariantes que ya tenia su sitio.
+
+| Tarea | Guard | Donde |
+|---|---|---|
+| T079 | Resolucion real del mapa (21 tests) | `tests/integration/test_navegacion_resolucion.py` |
+| T080 | El panel usa el enlace que resuelve el mapa, no la ruta en crudo | idem |
+| T081 | Los "ir a" del resumen apuntan a una pantalla real **y** a una superficie | idem |
+| T082 | Ningun destino del panel produce un `href` vacio | idem |
+| T083 | El ancla de un ajuste existe en su pagina | idem |
+| T084 | Un 403 de contexto no cierra la sesion; un 401 si | `tests/unit/test_navegacion_invariantes.py` |
+
+Los cuatro guards se **comprobaron reintroduciendo el defecto**: se revirtio cada
+correccion una a una y se confirmo que el test correspondiente falla. Un guard que no se
+ha visto fallar nunca no es un guard, es un comentario (leccion de §49, "un guard que
+nunca falla no comprueba nada").
+
+### Lo que esta auditoria NO cubre
+
+- **R3 y R6 del quickstart siguen sin comprobarse a mano.** El arnes comprueba que la
+  resolucion es correcta, no que la rejilla se **pinte** en un navegador. Con las
+  correcciones aplicadas, la resolucion de las seis landings es correcta, y el panel
+  pinta la rejilla en cuanto la obtiene; pero eso es un razonamiento, no una
+  observacion. La comprobacion honesta sigue siendo abrir `/contabilidad` y mirar.
+- **Lo que se ve sigue sin ser automatico.** Sigue sin haber test de frontend que
+  renderice. Lo que se ha ganado es que la mitad **decisional** de la navegacion -que
+  ruta pertenece a que superficie, a donde lleva cada enlace- es verificable, y esa
+  mitad era la que estaba rota.
+- **Sin `npm test` que valga.** El arnes es pytest, y depende de `node` y de que
+  `frontend/node_modules` este instalado. En un entorno sin installacion del frontend se
+  omite, y se dice.
+
+### Lecciones de la auditoria
+
+- **Un guard que lee la declaracion no vigila el comportamiento.** Todos los tests de
+  SPEC-031 leian `SUPERFICIES` con regex: comprobaban que el mapa declarase 6 superficies
+  y 101 destinos. No comprobaban que la aplicacion **resolviera** nada. La diferencia
+  entre las dos cosas es exactamente el defecto que se escapo.
+- **`tsc` y `next build` no se paran en el mismo sitio que el usuario.** Compilar bien una
+  pantalla que no pinta nada es un exito de las dos. Un 404 en `/tesoreria/conciliacion`
+  tambien.
+- **La entrada a una superficie es un caso que hay que probar como tal.** El mapa tiene
+  6 superficies y 101 destinos, y los tests cubrían los 101. El camino de "se entra por
+  el rail" -el mas usado de todos- no era ninguno de los dos.
+- **Un enlace sin destino no se ve en el codigo ni en las puertas.** `<Link href="">`
+  compila, pasa `tsc`, pasa ESLint y pasa `next build`. Solo se ve pulsandolo, y solo se
+  nota por contraste: al lado de enlaces que funcionan, un enlace que no lleva a ninguna
+  parte parece uno que funciona.
+- **El sintoma "solo veo los titulos" describe un fallo de resolucion, no de render.**
+  Se fue a mirar el render primero, y el render estaba bien. La pista estaba en el
+  parrafo de aviso, que decia una cosa distinta de la que se veia: el panel **sabia** que
+  no tenia superficie y lo decia. Ese parrafo era el diagnostico.
+- **Un 403 y un 401 no son el mismo error.** Tratarlos igual borro credenciales por un
+  problema de contexto, y no hay forma de recuperarlo desde el cliente. El codigo de
+  estado que decide si una sesion sobrevive lo tiene que dictar el servidor, no el
+  cliente.
+
+### Resultado de las puertas de la auditoria (T075-T084)
+
+| Puerta | Resultado |
+|---|---|
+| `pytest tests/integration/test_navegacion_resolucion.py` | **21 passed**, con el defecto A reintroducido fallan 2 y con C reintroducido fallan 2 |
+| `pytest tests/unit/test_navegacion_invariantes.py` | **26 passed**, con el defecto D reintroducido falla 1 |
+| pytest completo (SQLite) | **2968 passed / 23 skipped**. Unico fallo el flaky `test_suggest_perf` de SPEC-001, **2 passed** aislado. Antes de esta auditoria la suite **no se podia colectar**: `test_suggest_perf.py` tenia `import pytest` antes del `from __future__`, lo que es `SyntaxError` y detenia la recoleccion entera |
+| `ruff check src tests` | **All checks passed**. Los 2 errores que quedaban (F404, I001) eran de ese mismo fichero roto |
+| `tsc --noEmit` | limpio |
+| ESLint | 0 errores, 1 warning preexistente (`ContextZone`, `useCallback`/`pathname`) |
+| `next build` | verde, **110 paginas**, Middleware 34 kB |
+| mypy | limpio en **416 fuentes** |
+| PostgreSQL 18.6 real | migraciones 000-023 aplicadas e idempotentes; **19 passed** en `test_pg_schema.py` |
+
+Ademas se corrigio un tercer preexistente que hacia fallar la suite entera por un motivo
+sin relacion con las migraciones: `test_migrations.py::test_orden_por_dependencias` no
+conocia `023_seed_demo.sql`, que si esta en `ORDEN_PREFERENTE`. La lista `ESPERADAS` y la
+`ORDEN_PREFERENTE` son la misma lista escrita dos veces y se separaron cuando se anadio el
+seed de demo. Se anadieron dos guards, `test_el_inventario_coincide_con_orden_preferente`
+y `test_no_hay_migraciones_fuera_del_inventario`, para que la separacion falle con un
+mensaje que senala la lista en vez de con un fallo de orden que hay que descifrar.

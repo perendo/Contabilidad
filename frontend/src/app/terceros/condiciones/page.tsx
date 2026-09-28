@@ -1,7 +1,7 @@
-import { getToken } from "@/services/client";
-import { cabecerasEmpresa } from "@/components/treasury/empresa";
 "use client";
 
+import { getToken } from "@/services/client";
+import { cabecerasEmpresa } from "@/components/treasury/empresa";
 import { useCallback, useState } from "react";
 import { ApiError } from "../../../components/treasury/api";
 

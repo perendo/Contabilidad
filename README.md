@@ -237,29 +237,28 @@ AGENTS.md                               # Guía para agentes de IA
 | 028 | Cierre intermedio y reapertura controlada | 57/57 |
 | 029 | Exportación integral del tenant y enlace SII | 52/52 |
 | 030 | Documentos adjuntos al asiento | 48/48 |
+| 031 | Navegación y superficies | 74/74 (+10 de auditoría) |
 
-- Backend verificado el 2026-09-27: **2.659 pytest pass / 21 skipped**; las 2 pruebas
-  `test_suggest_perf` del lote principal quedaron verdes aisladas. Contra
-  **PostgreSQL 18.6 real**: **2.678 pass / 1 skipped** en la suite completa y
-  **18 passed** en el contrato de esquema. ruff + mypy limpios (406 fuentes).
-- Frontend verificado: `tsc`, ESLint y `next build` correctos, con **104 rutas**
-  (nuevas de SPEC-029: `/exportaciones`, `/exportaciones/nueva` y
-  `/exportaciones/[id]`).
-- Migraciones PostgreSQL `000`–`020` (007 = RBAC; 008 = forex; 009 = centros de coste;
-  010 = plantillas; 011 = ONG; 012 = efectos; 013 = anticipos/cesiones;
-  014 = IS/Modelo 200; 015 = retenciones, modelos 111/115/190, cuenta 4751 y triggers;
-  016 = catálogo versionado con trigger de vigencia sin solapes;
-  017 = presupuestos/desviaciones con unicidad por combinación cuenta-centro-ejercicio,
-  un solo periodo de seguimiento abierto y snapshot de desviación append-only;
-  018 = previsión de tesorería, con correlatividad de `numero_prevision`, unicidad de
-  alerta por bucket, CHECK de saldo negativo y snapshot del EFE append-only;
-  019 = cierres, con clave natural del periodo, CHECK `total_debe = total_haber`,
-  snapshot del balance append-only, una sola solicitud de reapertura activa por
-  periodo y trigger `chk_journal_entry_fecha_abierta`;
-  020 = exportación integral, con unicidad del número por (empresa, año), un único
-  manifiesto y un único blob por exportación, `ConfigSii` por empresa y triggers
-  `chk_exportacion_immutable_*` (el snapshot es inmutable en `lista`/`fallida`) más
-  los append-only de manifiesto y blob).
+**31 specs** en total, **1.516/1.516 tareas** marcadas. La 031 se cerró y acto seguido
+hubo que **auditar el frontend**, porque la navegación no funcionaba: se veían los
+títulos de las secciones y no se podía entrar en ningún proceso. Ver
+[Navegación por superficies](#navegación-por-superficies-spec-031) y
+[AGENTS.md](AGENTS.md) §51.
+
+- Backend verificado el 2026-09-28: **2.968 pytest pass / 23 skipped**; el único fallo
+  es la prueba `test_suggest_perf` de SPEC-001, flaky conocido bajo carga, que queda
+  **verde aislada** (2 passed). Contra **PostgreSQL 18.6 real**: migraciones `000`–`023`
+  aplicadas e idempotentes y **19 passed** en el contrato de esquema. ruff + mypy
+  limpios (416 fuentes).
+- Frontend verificado: `tsc`, ESLint y `next build` correctos, con **110 páginas**
+  (6 nuevas de SPEC-031: las landings `/contabilidad`, `/facturacion`, `/informes`,
+  `/fiscal`, `/maestros` y `/maestros/empresas`).
+- Migraciones PostgreSQL `000`–`023` (020 = exportación integral, con unicidad del
+  número por (empresa, año), un único manifiesto y un único blob por exportación,
+  `ConfigSii` por empresa y triggers `chk_exportacion_immutable_*` más los append-only
+  de manifiesto y blob; 021 = documentos adjuntos al asiento, con unicidad de huella
+  `(empresa_id, journal_entry_id, sha256)`, FK compuesta al diario e inmutabilidad real
+  del contenido; 022 = favoritos por usuario y empresa; 023 = seed de demostración).
 - CI: `.github/workflows/ci.yml` ejecuta PostgreSQL + pytest, ruff, mypy, typecheck,
   ESLint y build frontend.
 - Pendiente: no queda ninguna spec diseñada sin implementar. El trabajo
@@ -293,6 +292,59 @@ baja logica.
 Los documentos adjuntos **no** se incluyen todavia en la exportacion integral del
 tenant (SPEC-029) ni en el libro-diario PDF oficial (SPEC-019): queda
 declarado como ampliacion posterior.
+
+
+### Navegación por superficies (SPEC-031)
+
+El programa se organiza en **seis superficies** (Contabilidad, Facturación, Tesorería,
+Informes, Fiscal y Maestros) con un rail fijo, un panel contextual por superficie, la
+zona de contexto siempre visible (identidad, empresa y ejercicio) y **favoritos por
+usuario y empresa**.
+
+- **Contexto**: `GET /api/v1/contexto` devuelve identidad, empresa activa, ejercicio
+  activo y el listado de ejercicios con su estado y su número de asientos. El
+  ejercicio viaja en la cabecera `X-Ejercicio-Activa` y se valida contra la empresa de
+  la sesión, de modo que es un filtro **intra-tenant**, no un límite de aislamiento.
+- **Favoritos**: `GET/PUT/PATCH/DELETE /api/v1/favoritos` sobre la clave estable del
+  destino, no sobre su ruta, para que sobrevivan a una reubicación. Se muestran hasta
+  5, pero el sexto **se guarda y se avisa**: el recorte es en la lectura, nunca en la
+  escritura, para no dejar al usuario con cinco favoritos sin poder añadir el suyo.
+- **Resumen**: `GET /api/v1/resumenes/{superficie}` con el estado del ejercicio activo.
+  Admite ejercicios cerrados a propósito, porque preguntar por un cierre es la pregunta
+  más natural que se le puede hacer a un cierre.
+
+#### La auditoría del frontend que hizo falta
+
+Al abrir la aplicación tras cerrar la spec, **solo se veían los títulos de las secciones
+y no se podía entrar en ningún proceso**. El rail se veía perfecto; detrás no había nada.
+
+La causa era una línea: la función que resuelve «qué superficie corresponde a esta ruta»
+buscaba la ruta entre los **destinos** de cada superficie y nunca entre su **landing**, y
+ninguna superficie declara su propia landing como destino. Las seis pantallas de entrada
+devolvían «no hay superficie», así que el panel no pintaba ni la rejilla de destinos ni
+el resumen, y mostraba además un aviso de pantalla huérfana.
+
+Lo instructivo no es el fallo, sino **por qué ninguna puerta lo detectó**. La spec sustituye
+el test de frontend —que el proyecto no tiene— por cuatro puertas, y las cuatro pasan con
+la navegación rota: `tsc` no tiene ningún tipo que comprobar, `next build` verifica que las
+rutas compilan y no que la rejilla se pinte, y los tests de pytest leían el mapa con
+expresiones regulares, es decir, comprobaban que lo **declarase** bien y no que lo
+**resolviera** bien. Un `if` invertido dentro de una función pura es invisible a un regex.
+
+Por eso se añadió `backend/tests/integration/test_navegacion_resolucion.py`, que compila
+el mapa de navegación con el `tsc` del propio proyecto y lo **evalúa** con `node`: una
+prueba que ejecuta el código en vez de leer su declaración. Reimplementar la lógica en
+Python no habría servido, porque el defecto no estaba en la comparación, sino en que la
+función nunca llegaba a comparar la landing.
+
+De la misma auditoría salieron tres defectos más: el ajuste de información fiscal se
+renderizaba como `<Link href="">` (un enlace que no lleva a ninguna parte), cinco de los
+trece enlaces del resumen apuntaban a rutas inexistentes o fuera del mapa, y un `403` de
+contexto de empresa destruía la sesión, provocando un bucle de identificación en el que el
+usuario tecleaba bien su contraseña y cada intento lo expulsaba al login.
+
+Detalle completo en [AGENTS.md](AGENTS.md) §51 y en
+`specs/031-navegacion-superficies/tasks.md`.
 
 
 ## Tests
@@ -395,10 +447,50 @@ El sistema cuenta con lanzadores multiplataforma que verifican puertos, entorno 
   docker compose up --build
   ```
 
+Los tres lanzadores levantan **los dos** procesos: backend en el puerto 8000 y frontend
+en el 3000. El frontend no arranca el backend, así que si abres la aplicación sin él la
+pantalla de identificación aparecerá y **el envío del formulario fallará con «Error de
+conexión»**: el login hace `POST /api/v1/auth/login`, que Next reescribe contra
+`http://localhost:8000`.
+
+#### Si el login no pasa
+
+Por orden, porque el síntoma es el mismo en los tres casos:
+
+1. **El backend está caído.** Es lo primero que hay que mirar, y lo que pasó en la
+   sesión del 2026-09-28. Sin backend, el login no tiene a quién preguntar. Comprueba
+   `http://localhost:8000/health`; si no responde, el proceso no está vivo.
+   Además, arrancar uvicorn **exige `PYTHONPATH`**, porque la aplicación está en
+   `backend/src/` y no en la raíz del paquete:
+   ```powershell
+   cd backend
+   $env:PYTHONPATH="src"; ..\.venv\Scripts\python.exe -m uvicorn main:app --port 8000
+   ```
+   Sin esa variable, uvicorn responde `Error loading ASGI app. Could not import module
+   "main"`, que es un error de arranque, no de credenciales.
+2. **Sobran procesos de desarrollo.** Dos instancias de `next dev` compitiendo por el
+   mismo puerto dejan el árbol en un estado inconsistente; la segunda falla al tomar el
+   puerto o sirve un `.next` a medio construir. Comprueba y limpia:
+   ```powershell
+   Get-NetTCPConnection -LocalPort 3000,8000 -State Listen
+   Get-Process node,python | Select-Object Id, StartTime
+   ```
+3. **El estado de autenticación quedó a medias.** El token vive en `localStorage` y la
+   cookie `httpOnly` de `sesion_token` la usa `src/middleware.ts` solo para la redirección
+   optimista. Si una de las dos se quedó, el comportamiento es raro: se entra a páginas
+   que deberían pedir identificación, o se vuelve al login con la sesión puesta. Cierra
+   la pestaña y vuelve a abrir.
+
+> Un `403` al pedir el contexto **no** destruye la sesión desde la corrección del
+> 2026-09-28. `get_empresa_id` responde `403` cuando falta la empresa activa, y eso es un
+> problema de contexto, no de credenciales; solo un `401` de `get_current_user` cierra la
+> sesión. Antes de esa corrección, un `403` borraba el token y provocaba un bucle de
+> identificación. Si volveras a ver ese bucle, mira primero si el backend está levantado.
+
 ### Configurar la base de datos
 
 **No hay Alembic.** El proyecto usa un runner propio: `backend/src/db/migrate.py`
-ejecuta los 23 ficheros SQL de `backend/migrations/` en un orden explícito
+ejecuta los 24 ficheros SQL de `backend/migrations/` en un orden explícito
 (`ORDEN_PREFERENTE`, porque el número no coincide con las dependencias de FK), todo
 en una sola transacción, y los ficheros son idempotentes. En SQLite —que es lo que
 usan los tests— no hay migraciones: `Base.metadata.create_all()` más `src/db/triggers.py`.
@@ -406,10 +498,14 @@ usan los tests— no hay migraciones: `Base.metadata.create_all()` más `src/db/
 ```powershell
 cd backend
 $env:PYTHONPATH="src"
-..\.venv\Scripts\python.exe -m db.migrate        # aplica 000-022
+..\.venv\Scripts\python.exe -m db.migrate        # aplica 000-023
 ```
 
-El runner registra las versiones aplicadas en la tabla `schema_migrations`, evitando re-ejecuciones innecesarias y asegurando trazabilidad del esquema.
+El inventario de migraciones está duplicado a propósito: `ORDEN_PREFERENTE` en
+`db/migrate.py` (la que usa el runner) y `ESPERADAS` en `tests/unit/test_migrations.py`
+(la que afirma el contenido de ficheros concretos). Dos guards mantiene la sincronía,
+porque olvidarse de una de las dos listas hace fallar la suite entera por un motivo que no
+tiene nada que ver con las migraciones.
 
 ### Primer usuario
 
@@ -420,24 +516,42 @@ creando además las filas de `FiscalYear` y `EjercicioContable` del ejercicio in
 Ver la sección 50 de [AGENTS.md](AGENTS.md) para el procedimiento completo y sus
 limitaciones.
 
+La migración `023_seed_demo.sql` deja además un usuario de demostración listo
+(`admin@contabilidad.es` / `admin123`, empresa «Empresa Demo S.L.», ejercicio 2026
+abierto), para poder interactuar desde el primer minuto sin hacer el alta a mano.
+
 ### Verificación
 
 ```powershell
 # Backend (desde backend/)
-..\.venv\Scripts\python.exe -m pytest                 # 2659 passed, 21 skipped; perf verde aislado
-..\.venv\Scripts\python.exe -m ruff check src tests
+..\.venv\Scripts\python.exe -m pytest                 # 2968 passed, 23 skipped; perf verde aislado
+..\.venv\Scripts\python.exe -m ruff check src tests   # All checks passed
 ..\.venv\Scripts\python.exe -m mypy -p api -p models -p services -p database -p base -p db -p main -p config
 
 # Contra PostgreSQL 18.6 real (credenciales en backend/.env)
 $env:PYTHONPATH="src"; ..\.venv\Scripts\python.exe -m db.migrate
 $env:PYTHONPATH="src"; $env:TEST_DATABASE_URL="postgresql+asyncpg://postgres:<password>@localhost:5432/contabilidad"
-..\.venv\Scripts\python.exe -m pytest                   # 2678 passed, 1 skipped (18 en tests/integration/test_pg_schema.py)
+..\.venv\Scripts\python.exe -m pytest                   # 19 passed en tests/integration/test_pg_schema.py
 
 # Servidor
-$env:PYTHONPATH="src"; ..\.venv\Scripts\python.exe -m uvicorn main:app --reload
+$env:PYTHONPATH="src"; ..\.venv\Scripts\python.exe -m uvicorn main:app --port 8000
 
 # Frontend (desde frontend/)
 node node_modules/typescript/bin/tsc --noEmit
 node node_modules/eslint/bin/eslint.js src
 $env:NEXT_TELEMETRY_DISABLED="1"; node node_modules/next/dist/bin/next build
+
+# Navegación: comprueba que el mapa se RESUELVE, no solo que se declara
+..\.venv\Scripts\python.exe -m pytest tests/integration/test_navegacion_resolucion.py
 ```
+
+> **No ejecutes `next build` con un `next dev` en marcha**: ambos escriben en `.next` y se
+> pisan. En una sesión anterior, un `next build` de verificación dejó el servidor de
+> desarrollo sirviendo un estado inconsistente, y el síntoma fue una aplicación que no
+> cargaba. Si necesitas ambos, compila en otro directorio o para el dev antes de compilar.
+
+La última línea es la que faltaba cuando la navegación estaba rota. `tsc`, ESLint y
+`next build` pasan con la aplicación inservible, porque comprueban que el código compila,
+no que funcione. El guard que sí lo detecta **ejecuta** el mapa de navegación con el `tsc`
+del proyecto y `node`. Si `node` no estuviera, el test se omite con un motivo explícito
+en vez de fingir que se comprobó.
