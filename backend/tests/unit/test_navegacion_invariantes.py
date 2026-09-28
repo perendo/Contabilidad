@@ -29,6 +29,8 @@ import pytest
 
 RAIZ = Path(__file__).resolve().parents[3]
 MAPA = RAIZ / "frontend" / "src" / "components" / "navigation" / "surfaces.ts"
+GUARD = RAIZ / "frontend" / "src" / "middleware.ts"
+SESION = RAIZ / "frontend" / "src" / "components" / "navigation" / "SessionContext.tsx"
 
 #: Siglas que el dominio usa de forma habitual. Se permiten ** accompanied de su
 #: significado** (por ejemplo "Modelo 200"), nunca solas.
@@ -344,3 +346,53 @@ def test_terceros_de_interaccion_exigen_teclado() -> None:
     comprueba en `test_navegacion_accesibilidad.py` (T060), no en el mapa.
     """
     assert "onKeyDown" not in _texto(), "el mapa no debe contener manejadores de teclado"
+
+
+# ---------------------------------------------------------------------------
+# 6. El guard no puede fabricar respuestas de pagina
+# ---------------------------------------------------------------------------
+
+
+def test_el_guard_no_redirige_la_api() -> None:
+    """`/api/v1/*` no es una pagina: redirigirlo rompe al cliente, no le protege.
+
+    El fallo que fija este test fue real. Sin cookie de sesion, el guard redirigia
+    tambien las peticiones a la API, el `fetch` seguia el redirect y recibia el **HTML
+    de la pantalla de identificacion con un 200** en lugar del 401 del backend. El
+    cliente no puede parsear eso como JSON, se quedaba con un cuerpo vacio que
+    `ContextZone` tomaba por un contexto, y la cabecera reventaba con
+    "Cannot read properties of undefined (reading 'email')" **sin ningun 401 visible**.
+
+    Se comprueban los dos sitios por los que puede colarse la redireccion, porque
+    estan en ficheros distintos y basta con tocar uno para que el otro vuelva a
+    redirigir: la lista `EXCLUIDAS` que lee la funcion y el `matcher` que decide que
+    rutas llegan a ejecutarla.
+    """
+    texto = GUARD.read_text(encoding="utf-8")
+    assert '"/api/v1"' in texto, "la API no esta en la lista de rutas excluidas del guard"
+    assert re.search(r"matcher:.*api/v1", texto, re.DOTALL), (
+        "el matcher del middleware sigue encompassando /api/v1, que es lo que hace "
+        "que la redireccion se ejecute aunque la funcion la esquive"
+    )
+
+
+def test_la_sesion_no_acepta_una_respuesta_que_no_es_un_contexto() -> None:
+    """El cliente comprueba la FORMA de la respuesta, no solo su tipo declarado.
+
+    `get<ContextoSesion>` es una asercion, no una comprobacion: `tsc` la acepta y en
+    tiempo de ejecucion `contexto.usuario` puede no existir. Con la respuesta vacia que
+    producia el fallo anterior, la zona de contexto se saltaba su guard de "no hay
+    contexto" porque `{}` es truthy, y el error se manifestaba a tres saltos del
+    sitio donde estaba la causa.
+
+    Se fija en la frontera y no en el consumidor a proposito: el invariants de "si hay
+    contexto, tiene usuario, empresa y ejercicio" tiene que decidirlo **un** sitio. En
+    cada componente seria veinte decisiones que pueden discrepar.
+    """
+    texto = SESION.read_text(encoding="utf-8")
+    assert "esContexto" in texto, "SessionContext no valida la forma de la respuesta"
+    assert "get<unknown>" in texto, (
+        "el contexto se sigue leyendo con un tipo declarado en vez de `unknown`: la "
+        "asercion `as T` es justamente lo que no comprueba nada"
+    )
+

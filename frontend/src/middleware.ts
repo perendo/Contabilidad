@@ -24,12 +24,21 @@ import { COOKIE_SESION } from "@/lib/constantes-sesion";
 /** Rutas accesibles sin sesion. La de la propia pantalla de identificacion. */
 const PUBLICAS = ["/login"];
 
-/** Ficheros estaticos que no pasan por el guard. */
+/** Ficheros estaticos y rutas que no pasan por el guard. */
 const EXCLUIDAS = [
   "/_next/static",
   "/_next/image",
   "/favicon.ico",
   "/api/sesion",
+  // El espacio de la API **no es una pagina**: redirigirlo rompe al cliente. Un
+  // `fetch` a `/api/v1/...` sin sesion tiene que recibir el 401 del backend, que es la
+  // respuesta que `SessionContext` y el resto de pantallas ya saben leer. Si aqui se
+  // redirigiera, el `fetch` seguiria el 307, recibiria el HTML del login con un 200,
+  // `manejar()` de `services/client.ts` no lo podria parsear a JSON y devolveria `{}`:
+  // un contexto vacio que `ContextZone` daria por bueno y sobre el que leeria
+  // `usuario.email`, con el TypeError "Cannot read properties of undefined" que rompia
+  // la pantalla entera. Ver `test_el_guard_no_redirige_la_api`.
+  "/api/v1",
 ];
 
 export function middleware(peticion: NextRequest): NextResponse {
@@ -55,5 +64,7 @@ export function middleware(peticion: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/sesion).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|api/sesion|api/v1).*)",
+  ],
 };

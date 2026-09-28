@@ -367,6 +367,44 @@ El núcleo contable está implementado y verificado. El punto de partida recomen
 sugerido: **030**.
 El recuento vivo esta en [pendientes.md](pendientes.md).
 
+### Arranque rápido
+
+En Windows, `start.bat` en la raíz delega en `scripts/dev_start.py`, que comprueba los
+puertos 8000/3000, el venv y `next`, levanta el backend y el frontend en consolas
+separadas, espera al health check y abre el navegador a pantalla completa.
+
+```powershell
+.\start.bat
+```
+
+### Configurar la base de datos
+
+**No hay Alembic.** El proyecto usa un runner propio: `backend/src/db/migrate.py`
+ejecuta los 23 ficheros SQL de `backend/migrations/` en un orden explícito
+(`ORDEN_PREFERENTE`, porque el número no coincide con las dependencias de FK), todo
+en una sola transacción, y los ficheros son idempotentes. En SQLite —que es lo que
+usan los tests— no hay migraciones: `Base.metadata.create_all()` más `src/db/triggers.py`.
+
+```powershell
+cd backend
+$env:PYTHONPATH="src"
+..\.venv\Scripts\python.exe -m db.migrate        # aplica 000-022
+```
+
+Los ficheros deben ser **idempotentes**: el runner no lleva tabla de versionado, así
+que re-aplica los 23 en cada ejecución.
+
+### Primer usuario
+
+No hay endpoint de alta de usuario. El alta se hace con los servicios reales
+(`crear_empresa` de `services/auth/company_service.py`, que siembra el plan de
+cuentas y la matriz de permisos, y `hash_password()` de `services/auth/security.py`),
+creando además las filas de `FiscalYear` y `EjercicioContable` del ejercicio inicial.
+Ver la sección 50 de [AGENTS.md](AGENTS.md) para el procedimiento completo y sus
+limitaciones.
+
+### Verificación
+
 ```powershell
 # Backend (desde backend/)
 ..\.venv\Scripts\python.exe -m pytest                 # 2659 passed, 21 skipped; perf verde aislado

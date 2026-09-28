@@ -2,19 +2,27 @@
 setlocal
 
 set "PROJECT_ROOT=%~dp0"
-set "VENV=%PROJECT_ROOT%.venv\Scripts\activate.bat"
+set "VENV_ACTIVATE=%PROJECT_ROOT%.venv\Scripts\activate.bat"
+set "VENV_PYTHON=%PROJECT_ROOT%.venv\Scripts\python.exe"
+set "LAUNCHER=%PROJECT_ROOT%scripts\dev_start.py"
 
-if not exist "%VENV%" (
+if not exist "%VENV_PYTHON%" (
     echo No se encontro el entorno virtual en:
     echo %PROJECT_ROOT%.venv
+    echo Crealo con:  python -m venv .venv
+    echo Y luego instala las dependencias:  .venv\Scripts\pip install -r backend\requirements.txt
     pause
     exit /b 1
 )
 
-call "%VENV%"
-set "PYTHONPATH=%PROJECT_ROOT%backend\src"
-cd /d "%PROJECT_ROOT%backend"
+call "%VENV_ACTIVATE%"
+"%VENV_PYTHON%" "%LAUNCHER%"
+set "EXITCODE=%ERRORLEVEL%"
 
-python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+if not "%EXITCODE%"=="0" (
+    echo.
+    echo El arranque fallo o se cancelo. Revisa el mensaje de arriba.
+    pause
+)
 
-pause
+exit /b %EXITCODE%

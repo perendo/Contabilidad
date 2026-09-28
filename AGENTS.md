@@ -164,8 +164,10 @@ Cada spec tiene en su `tasks.md` una tabla **Trazabilidad FR ↔ User Story** y 
 
 ## 8. Git / GitHub
 
-- Repo aún **no inicializado** como git (no es repo git todavía). `.gitignore` ya existe (Python/Node/secrets). Si el usuario pide subirlo: `git init`, commit inicial y `gh repo create` / push a GitHub.
-- Comprobar siempre `.env` y secretos: nunca commitear credenciales.
+- **El repo SÍ está inicializado** (corregido 2026-09-28; esta sección decía lo contrario). Remoto `origin` = `https://github.com/perendo/Contabilidad.git`, rama con 1 commit inicial (`8a5c57a`).
+- **`gh` NO está instalado** en esta máquina: hay que subir con `git push` a pelo. No des por hecho que `gh auth status` funciona.
+- `.gitignore` cubre `.env` y `.env.*` con `!.env.example` (líneas 27-29). Confirmado con `git check-ignore -v backend/.env` → `.gitignore:27`. La plantilla sin secretos es `backend/.env.example`; **nunca** commitear `.env` (contiene la contraseña de PostgreSQL y el `SECRET_KEY` del JWT).
+- Antes de cada commit: `git status --short` + `git grep -n -e <secreto>` sobre lo rastreado. Subir una clave de firma a un repo público permite forjar tokens de ADMIN.
 
 ## 9. Notas de contexto para continuar
 
@@ -2132,3 +2134,132 @@ crea asientos).
 - **El boundary ACID sigue siendo `get_db` + `flush()`** (constitucion 1.0.1, §48).
   Ningun servicio de esta feature abre transaccion ni hace commit, y
   `test_constitucion_navegacion.py` lo verifica.
+
+## 50. Cierre de sesion: usuario real, base limpia y sistema de migraciones (2026-09-28)
+
+Trabajo **fuera del ciclo de specs**: arranque de la aplicacion con un usuario
+real y limpieza de la base de PostgreSQL, que estaba llena de artefactos de las
+suites de test.
+
+### Arranque en local
+
+- **`start.bat`** (raiz) reescrito: delega en **`scripts/dev_start.py`**, que
+  comprueba puertos 8000/3000, el venv y `next`, levanta backend y frontend en
+  consolas separadas, espera al health check y abre el navegador a pantalla
+  completa.
+- **Correccion de runtime**: `ContextZone.tsx` reventaba con `TypeError:
+  Cannot read properties of undefined (reading 'permissions')`. La causa estaba
+  en `frontend/src/middleware.ts`, que redirigia a `/login` las rutas
+  `/api/v1/*`; y en `SessionContext.tsx`, que leia `payload` sin comprobar que
+  la respuesta fuera un objeto antes de hacer `String(p).split(":")` sobre los
+  permisos. Ambos corregidos, con 2 tests en
+  `backend/tests/unit/test_navegacion_invariantes.py`. Verificado: 57 tests de
+  navegacion en verde, `ruff`, `tsc`, ESLint y `next build` limpios.
+
+### Alta de usuario (no hay endpoint)
+
+- **No existe endpoint de alta de usuario**; las rutas de `SPEC-003` son solo
+  login, `me`, switch de empresa y alta/listado de empresas. El alta se hace
+  con el servicio real `crear_empresa` (`services/auth/company_service.py`), que
+  siembra el PGC y la matriz RBAC, y con `hash_password()` de
+  `services/auth/security.py` (bcrypt, sin politica de minimos).
+- Alta aplicada: `perendo@gmail.com` / `Pedro Rendo Quindos`, empresa
+  **Obispado de Getafe** (`R7800489B`, CIF con digito de control correcto), rol
+  `ADMIN`, 109 permisos en 15 modulos, ejercicio **2026** `abierto` y
+  seleccionable.
+- **El endpoint `POST /ciclo/apertura` no sirve para el primer ejercicio.**
+  `validar_precondiciones_apertura` (`services/cycle/validacion_previa.py:137`)
+  exige que el ejercicio **previo exista y este cerrado**, y
+  `generar_asiento_apertura` rechaza ademas los saldos patrimoniales vacios. Una
+  empresa recien creada no tiene 2025, asi que el alta va por dos filas
+  directas: `FiscalYear` (SPEC-004, gobierna informes y cierre) y
+  `EjercicioContable` (SPEC-009, es la que hace que el ejercicio sea
+  *seleccionable* en `/contexto`; sin ella aparece en la lista pero no se puede
+  escribir).
+- **El estado es `abierto`, no `con_apertura`.** `con_apertura` significa "existe
+  un asiento de apertura", y aqui no lo hay porque no hay previo que saldar.
+  Ponerlo seria mentirle al selector de ejercicio. Si el Obispado arrastra
+  saldos de 2025 hay que montar el ciclo completo: alta de 2025, saldos, cierre
+  y despues apertura de 2026.
+
+### Limpieza de la base: por que se reconstruyo
+
+- **Bloqueante**: el trigger `chk_account_plan_protected`
+  (`migrations/001_account_plan.sql:110-137`) rechaza el `DELETE` de una cuenta
+  si tiene hijas en el arbol **o** apuntes en `journal_entry_line`, y
+  `account_plan` es un arbol de 4 niveles sembrado por empresa.
+- Medido antes de borrar: 133 empresas de test, **10.906** filas de
+  `account_plan` (82 cuentas x 133), **23.807** de `matriz_permiso`, 399 de
+  `roles`, 38 asientos y 76 lineas en 14 empresas, y 25 tablas mas con 6 filas
+  cada una. **31 tablas** en total.
+- Vaciar eso a mano exige ordenar 31 tablas por FKs y el arbol de cuentas de
+  abajo arriba peleando con triggers de borrado protegido. La via fiable es la
+  que ya usan los tests: `DROP DATABASE` + `db.migrate` (las 23 migraciones son
+  idempotentes y se aplican limpias) + recrear el alta.
+- Secuencia ejecutada: `pg_dump` (1,09 MB, en el Temp) -> `DROP`/`CREATE` ->
+  `db.migrate` 23/23 -> alta. Verificado: **0 empresas de test, 0 tablas con
+  datos de sobra**, y el login devuelve 200 con `default_company_id=1` y el
+  contexto completo.
+- **Las pruebas vuelven a llenar esto**: `pytest` contra PostgreSQL inserta
+  empresas en `companies` (`test_cierre_concurrente` y compañía), asi que hay
+  que ejecutar `db.migrate` antes de la suite completa contra PG.
+
+### Sistema de migraciones: **no hay Alembic**
+
+- Verificado 2026-09-28: `alembic` **no esta instalado** (ni en el venv, ni en
+  `requirements.txt`, ni ficheros `alembic.ini`/`alembic/`), y
+  `import alembic` da `ModuleNotFoundError`. Tampoco hay yoyo, dbmate, goose ni
+  Liquibase: lo unico del gener en el venv es SQLAlchemy.
+- El sustituto es **propio** y son dos mecanismos:
+  - **PostgreSQL**: `backend/src/db/migrate.py` (87 lineas) ejecutando 23
+    ficheros `backend/migrations/*.sql`. Usa `ORDEN_PREFERENTE` porque el numero
+    no coincide con las FKs (`001_account_plan` referencia `companies`, que crea
+    `004_iam.sql`); todo va en **una sola transaccion** (`engine.begin()`), asi
+    que un fallo revierte el lote; y usa el protocolo simple de asyncpg
+    (`driver_connection.execute`) porque cada `.sql` trae varios comandos.
+  - **SQLite (tests)**: nada de SQL. `Base.metadata.create_all()` mas
+    `src/db/triggers.py`, el **espejo manual** de los triggers `plpgsql` para
+    que la inmutabilidad se pruebe sin PostgreSQL.
+- **Lo que le falta frente a Alembic**, por orden de importancia:
+  1. **No hay tabla de versionado** (ni `alembic_version` ni equivalente). Se
+     re-aplican los 23 ficheros en cada ejecucion y la seguridad depende de que
+     todos sean idempotentes. Editar una migracion ya aplicada obliga a que siga
+     siendo idempotente; si no, `db.migrate` falla sin saber en que estado quedo
+     la base.
+  2. **Sin `downgrade`**: la vuelta atras es el backup.
+  3. **Sin autogenerate**: nada compara `models/*.py` con el esquema, asi que
+     ambos pueden divergir sin que nada lo detecte. Es real: hay tablas que solo
+     viven en `create_all` y nunca llegaron a migracion, y la verificacion PG
+     "cubre las tablas migradas".
+  4. **El orden es una constante manual**: anadir migracion exige acordarse de
+     tocar `ORDEN_PREFERENTE`, si no se aplica en orden alfabetico y revienta
+     por una FK.
+- Si se decide meter Alembic, el orden correcto no es instalarlo: es decidir que
+  se hace con las 23 migraciones ya aplicadas y con las tablas que solo viven en
+  `create_all`.
+
+### Lecciones reutilizables
+
+- **Medir antes de borrar.** "Borra las empresas basura" parecia un `DELETE` de
+  133 filas y era un vaciado de 31 tablas con 34.000 filas y un trigger de
+  proteccion. El recuento por tabla, agrupado por empresa, es lo que decidio el
+  metodo; sin el, se llega tarde.
+- **Un trigger de borrado protegido se esquiva con `DROP DATABASE`, no
+  peleando.** La constraint protege filas, no el esquema. Reconstruir desde
+  migraciones idempotentes es mas barato y mas fiable que ordenar borrados.
+- **Reconstruir exige poder reponer lo real.** El backup va antes del `DROP` y
+  el alta se conserva como script: si el alta viviera solo en un `INSERT` a
+  mano, el rebuild la perderia.
+- **`es_seleccionable` no depende de `FiscalYear`.** El contexto exige
+  `EjercicioContable`; crear solo la fila de `FiscalYear` deja el ejercicio
+  visible pero no utilizable, y el sintoma (aparece en la lista y no deja
+  escribir) no apunta a la fila que falta.
+- **Un estado que significa "existe un asiento de apertura" no se pone porque
+  falte el asiento.** `abierto` es el estado honesto de un ejercicio recien
+  creado.
+- **`String(p).split(":")` sobre una respuesta de objetos** es un fallo que ya
+  se ha dado dos veces en este repo: bien tipado, silencioso en produccion, y
+  hacia que el panel de permisos ocultara todos los destinos. Toda respuesta de
+  la API se comprueba antes de deserializarla.
+- **`gh` ausente no significa que no haya repo.** Comprobar `git remote -v`
+  antes de asumir que hay que inicializar nada.

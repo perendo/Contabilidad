@@ -91,6 +91,42 @@ const SessionContext = createContext<SessionState | null>(null);
 
 export const RUTA_CONTEXTO = "/api/v1/contexto";
 
+/**
+ * Comprueba que lo que devuelve el servidor es **un contexto** y no otra cosa.
+ *
+ * POR QUE HACE FALTA SI `get` YA ESTA TIPADO
+ *
+ * `get<ContextoSesion>` no comprueba nada: `request` hace `as T` sobre el cuerpo ya
+ * parseado, y el tipo solo existe en tiempo de compilacion. Si la respuesta no es el
+ * JSON que se espera, el cliente recibe otra cosa **`declarada` como contexto**. Con
+ * `tsc` en verde.
+ *
+ * El caso real que hizo falta: sin cookie de sesion, el guard de `src/middleware.ts`
+ * redirigia tambien `/api/v1/*` al login, el `fetch` seguia el redirect y recibia el
+ * **HTML de la pantalla de identificacion con un 200**. `manejar()` de
+ * `services/client.ts` no puede parsear eso a JSON y devuelve `{}`; `{}` es truthy, asi
+ * que `ContextZone` se saltaba su propio guard de "no hay contexto" y leia
+ * `usuario.email` de un objeto que no existia. El sintoma era un TypeError en la
+ * cabecera, a tres saltos del sitio donde estaba el fallo.
+ *
+ * Por eso el invariants de "si hay contexto, tiene usuario, empresa y ejercicio" se
+ * comprueba en la **frontera** y no en el consumidor: un solo sitio donde decidir que
+ * la respuesta no sirve, en vez de veinte que Each comprueban un campo.
+ *
+ * Solo se miran los tres bloques de los que la cabecera depende. No se valida el
+ * contenido campo a campo: eso duplicaria el contrato del backend sin Avoidar el
+ * fallo, que no es un campo mal escrito sino una respuesta que no es un contexto.
+ */
+function esContexto(datos: unknown): datos is ContextoSesion {
+  if (typeof datos !== "object" || datos === null) return false;
+  const c = datos as Record<string, unknown>;
+  return (
+    typeof c.usuario === "object" && c.usuario !== null &&
+    typeof c.empresa === "object" && c.empresa !== null &&
+    typeof c.ejercicio_activo === "object" && c.ejercicio_activo !== null
+  );
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [contexto, setContexto] = useState<ContextoSesion | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -103,7 +139,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setSinContexto(false);
     try {
-      const datos = await get<ContextoSesion>(RUTA_CONTEXTO);
+      const datos = await get<unknown>(RUTA_CONTEXTO);
+      // Una respuesta que no es un contexto se trata como sesion no utilizable, no
+      // como contexto vacio. La sesion se limpia para que el guard de `middleware.ts`
+      // envie a la pantalla de identificacion, que es la unica respuesta posible a
+      // "no se quien eres".
+      if (!esContexto(datos)) {
+        limpiarSesion();
+        setError("El servidor no ha devuelto el contexto de sesion.");
+        setContexto(null);
+        return;
+      }
       setContexto(datos);
     } catch (e) {
       // Un 401 aqui significa que la sesion no vale. Se limpia y el `SessionGuard`
