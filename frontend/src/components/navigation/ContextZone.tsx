@@ -30,6 +30,7 @@ import { get } from "@/services/client";
 import { useSesion } from "./SessionContext";
 import CompanySwitcher, { type EmpresaResumen } from "./CompanySwitcher";
 import ExerciseSwitcher from "./ExerciseSwitcher";
+import SessionMenu from "./SessionMenu";
 
 /** Corte de M3: por debajo de 600dp la zona colapsa (research D1). */
 const CORTE_COMPACTO = 640;
@@ -161,6 +162,9 @@ export default function ContextZone({
           <div className="border-t border-slate-200 bg-slate-50 px-2 py-2">
             <CompanySwitcher empresas={empresas} compacto />
             <ExerciseSwitcher compacto />
+            <div className="mt-1 border-t border-slate-200 pt-1">
+              <SessionMenu empresas={empresas} />
+            </div>
           </div>
         )}
       </header>
@@ -174,16 +178,8 @@ export default function ContextZone({
           <CompanySwitcher empresas={empresas} />
           <ExerciseSwitcher />
         </div>
-        <div className="flex items-center gap-2 py-1.5">
-          <span
-            className="rounded bg-slate-100 px-2 py-1 text-sm"
-            title={`${usuario.email}${usuario.rol ? ` · ${usuario.rol}` : ""}`}
-          >
-            {usuario.nombre}
-            {usuario.rol && (
-              <span className="ml-2 text-xs text-slate-500">{usuario.rol}</span>
-            )}
-          </span>
+        <div className="flex items-center py-1.5">
+          <SessionMenu empresas={empresas} />
         </div>
       </div>
     </header>

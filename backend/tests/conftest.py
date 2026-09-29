@@ -5063,6 +5063,80 @@ def documentos_client():
 
 
 @pytest.fixture
+def recon_client():
+    """HTTP client del router de conciliacion bancaria (SPEC-013).
+
+    Empresas A=10 y B=20 con el PGC base y un unico usuario ADMIN en las dos.
+    Vive aqui y no en `tests/integration/test_conciliacion_http.py` porque lo usan
+    tambien los tests del XLSX de banco: un fixture de un modulo de test no se
+    importa desde otro (rompe la recoleccion con el modo `prepend`).
+    """
+    from api.reconciliation import router as reconciliation_router
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False}
+    )
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _enable_fk(dbapi_connection, _):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async def _setup() -> str:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+            await conn.run_sync(instalar_triggers_sqlite)
+        async with factory() as session:
+            session.add(
+                User(id=1, email="ana@x.es", password_hash=hash_password("pw"), full_name="Ana")
+            )
+            await session.flush()
+            # Las empresas antes que `user_companies`: la FK compuesta
+            # `(user_id, company_id)` no tiene nada a lo que apuntar si no.
+            await sembrar_empresa_pgc(session, 10)
+            await sembrar_empresa_pgc(session, 20)
+            session.add_all(
+                [
+                    UserCompany(id=1, user_id=1, company_id=10, role=UserRol.ADMIN, is_default=True),
+                    UserCompany(id=2, user_id=1, company_id=20, role=UserRol.ADMIN),
+                ]
+            )
+            await session.flush()
+            await session.commit()
+        return emit_token(1)
+
+    loop = asyncio.new_event_loop()
+    try:
+        token = loop.run_until_complete(_setup())
+    finally:
+        loop.close()
+
+    app = FastAPI()
+    app.include_router(reconciliation_router)
+
+    async def override_db():
+        async with factory() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = override_db
+    with TestClient(app) as client:
+        yield client, token, factory
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(engine.dispose())
+    finally:
+        loop.close()
+
+
+@pytest.fixture
 def navegacion_client():
     """HTTP client de `GET /api/v1/contexto` (SPEC-031, US1).
 

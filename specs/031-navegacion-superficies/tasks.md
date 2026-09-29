@@ -916,3 +916,74 @@ conocia `023_seed_demo.sql`, que si esta en `ORDEN_PREFERENTE`. La lista `ESPERA
 seed de demo. Se anadieron dos guards, `test_el_inventario_coincide_con_orden_preferente`
 y `test_no_hay_migraciones_fuera_del_inventario`, para que la separacion falle con un
 mensaje que senala la lista en vez de con un fallo de orden que hay que descifrar.
+
+
+---
+
+# Corrección 2026-09-29: menú de sesión
+
+Trabajo **fuera del ciclo de tareas** de la spec, a petición del usuario sobre la
+aplicación en funcionamiento. Detalle en [`correcciones.md`](../../../correcciones.md) y
+[AGENTS.md](../../../AGENTS.md) §52.2.
+
+## Qué faltaba
+
+La zona de contexto mostraba empresa, ejercicio y usuario, y el usuario **no tenía
+ninguna acción**: su nombre era un `<span>` de texto. Los selectores de empresa y de
+ejercicio sí existían, a la izquierda, pero **cerrar sesión no existía en ninguna
+parte de la aplicación**. Para salir había que vaciar el `localStorage` a mano.
+
+La redacción original de FR-002 hablaba de identidad, empresa y ejercicio como
+**información** que se muestra, y no como **acciones**. Esa es la razón por la que
+una zona de contexto puede mostrarte quién eres y no darte forma de irte.
+
+## Tareas
+
+Se numeran a partir de T085 para no renumerar las 84 anteriores.
+
+- [X] T085 [P] [US1] Extraer `etiqueta()` y `clase()` de `ExerciseSwitcher.tsx` y exportarlas. FR-031 dice que el estado no puede depender solo del color, y son dos funciones: dos copias se separan en cuanto una de las dos se toca.
+- [X] T086 [US1] `frontend/src/components/navigation/SessionMenu.tsx`: identidad completa, **cambiar de empresa** (lista con NIF y la activa marcada), **cambiar de ejercicio** (año, etiqueta de estado y `n asientos`, cerrados deshabilitados con el motivo) y **cerrar sesión**.
+- [X] T087 [US1] Montar el menú en `ContextZone` **dos veces**: en la barra de escritorio, donde estaba el `<span>`, y dentro de la hoja de compacto. FR-003 pide las dos situaciones.
+- [X] T088 [US1] Delegar el cambio en `useSesion().cambiarEmpresa` / `cambiarEjercicio` en vez de escribir el almacen. Esos saben que hay que escribir **antes** de recargar, porque la cabecera `X-Empresa-Activa` viaja con la propia petición que recarga.
+- [X] T089 [US1] `salir()` borra el ejercicio seleccionado **antes** que la empresa activa, llama a `limpiarSesion()` y navega a `/login`. El orden no es cosmético y hay un guard que lo fija.
+- [X] T090 [US1] Accesibilidad: `role="menu"` / `menuitem` / `menuitemradio` con `aria-checked`, `aria-haspopup`, `aria-expanded`, cierre con `Escape` y al pulsar fuera, y el foco vuelve al disparador.
+- [X] T091 [P] [US1] `tests/unit/test_navegacion_menu_sesion.py` (20 guards): montaje en escritorio y compacto, las tres acciones, roles de menú, orden del cierre de sesión, que la cookie también se borra, que se delega en el contexto de sesión, que se reutiliza `etiqueta`/`clase`, que los cerrados no son elegibles, y que **los selectores rápidos no se han quitado**.
+- [X] T092 [US1] `spec.md`: añadir **FR-032** (menú de sesión) y el caso borde del orden del cierre. `quickstart.md`: R1 decía «cerrar sesión» sin decir cómo, y R2 no miraba el menú.
+
+## Desviaciones
+
+- **El menú no sustituye a los selectores rápidos.** Se **añade**. `CompanySwitcher` y
+  `ExerciseSwitcher` siguen a la izquierda porque son el camino rápido y llevan cosas
+  que el menú no puede contender: el contador de asientos por ejercicio, el atajo al
+  ejercicio anterior abierto, y el motivo por el que un cerrado no es seleccionable.
+  Un guard falla si desaparecen.
+- **Se reimplementa el pintado de las listas, no la lógica.** Delegar la lógica es lo
+  correcto y está hecho (T088). Pintar una lista es presentación, y lo que no se
+  reimplementa es la **regla de estado**, que es la que se exporta (T085).
+- **Guard de fuente, no de componente.** El proyecto no tiene runner de tests de
+  frontend, y añadir uno (vitest + jsdom + Testing Library) por tres reglas es más de
+  lo que se ha pedido. Los 20 guards **leen el fuente**: comprueban que el componente
+  esté montado, que las acciones existan y que el orden de las líneas sea el correcto.
+  **No comprueban que el menú se abra, se vea bien y el botón funcione** — eso hay que
+  mirarlo en un navegador, y hasta entonces la afirmación honesta es «compila, está
+  montado y las reglas están escritas», no «funciona».
+  Un guard de montaje es lo que hace falta aquí porque en la auditoría de §51 un
+  componente sin montar pasó `tsc`, ESLint y `next build` sin que nada lo dijera.
+- **El cierre de sesión es de cliente.** No hay `POST /logout` en el backend: se vacían
+  el token de `localStorage` y la cookie. El token expira solo a los 30 min
+  (`ACCESS_TOKEN_EXPIRE_MINUTES`) pero no hay lista de revocación, así que un token
+  robado sigue valiendo hasta expirar. Correspondería a SPEC-003 o a SPEC-032, y no
+  se ha hecho porque es un cambio de seguridad que no se ha pedido.
+
+## Estado real (2026-09-29, +8 tareas, 92/92)
+
+| Puerta | Resultado |
+|---|---|
+| `tests/unit/test_navegacion_menu_sesion.py` | **20 passed** |
+| `tsc` / ESLint | verdes (1 warning preexistente de `ContextZone`) |
+| `next build` | verde, sin rutas nuevas |
+
+**Lo que no se ha comprobado a mano**: que el menú se abra, se vea bien en escritorio y
+en móvil, y que el botón de cerrar sesión funcione. Los guards cubren el montaje y las
+reglas; el funcionamiento visual es una revisión manual pendiente, igual que lo estaba
+la rejilla de destinos de §51.

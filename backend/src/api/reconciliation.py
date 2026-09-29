@@ -36,6 +36,7 @@ from services.reconciliation.conciliacion import (
 )
 from services.reconciliation.cruce import CruceError, confirmar_cruce, deshacer_cruce
 from services.reconciliation.importacion import ImportacionError, importar_extracto
+from services.reconciliation.layouts import LAYOUTS
 from services.reconciliation.matching import generar_propuestas
 from services.reconciliation.parsers import LayoutError
 from services.reconciliation.saldos import generar_alertas, informe
@@ -71,6 +72,26 @@ def _fail(exc: Exception) -> NoReturn:
     if code in ("extracto_duplicado", "ejercicio_cerrado", "periodo_archivado", "periodo_cerrado", "conciliacion_previa", "movimiento_ya_conciliado", "diferencia_no_cero"):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"error": code, "detail": str(exc), **extra})
     raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail={"error": code, "detail": str(exc)})
+
+
+def _validar_layout(layout: str) -> str:
+    """Comprueba el `layout` contra el catalogo antes de leer el fichero.
+
+    Se valida aqui y no solo en el parser para que un formato desconocido se
+    responda con la lista de los que si valen. Sin esto el usuario recibia
+    "Linea 1: longitud 22 != 100", que habla de ancho fijo de un fichero que
+    ni de ancho fijo es, y no de que el desplegable mande otra cosa.
+    """
+    if layout not in LAYOUTS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "error": "layout_desconocido",
+                "detail": f"Formato no soportado: {layout or '(vacio)'}",
+                "soportados": LAYOUTS,
+            },
+        )
+    return layout
 
 
 async def _extracto(db: AsyncSession, empresa_id: int, extracto_id: uuid.UUID) -> ExtractoBancario:
@@ -118,6 +139,7 @@ async def subir_extracto(
     cuenta: Annotated[str | None, Form()] = None,
 ):
     contenido = await file.read()
+    _validar_layout(layout)
     try:
         extracto = await importar_extracto(
             session, empresa_id=empresa_id, file_bytes=contenido,

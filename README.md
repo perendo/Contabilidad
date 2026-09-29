@@ -44,9 +44,9 @@ Sistema de contabilidad multiempresa (multi-tenant) para el Plan General Contabl
 - **Asientos multilínea**: creación, anulación (rectificativo REVERSAL con original
   inmutable) e import/export de asientos con N partidas por lado; entrada por teclado
   (Enter añade fila, Ctrl+Supr elimina) con balance en tiempo real.
-- **Conciliación bancaria**: importación de extractos (norma 43/19 o CSV), propuestas
-  automáticas de cruce, cruce manual trazable, cálculo de diferencia y cierre/archivo
-  del período conciliado.
+- **Conciliación bancaria**: importación de extractos en **norma 43/19, CSV o el XLSX
+  que descarga el banco**, propuestas automáticas de cruce, cruce manual trazable,
+  cálculo de diferencia y cierre/archivo del período conciliado.
 - **Cuentas anuales**: Balance de Situación, Cuenta de Pérdidas y Ganancias y Estado de
   Flujos de Efectivo (EFE) por actividades, con formulación oficial inmutable por
   ejercicio cerrado (snapshot + hash SHA-256).
@@ -245,20 +245,22 @@ títulos de las secciones y no se podía entrar en ningún proceso. Ver
 [Navegación por superficies](#navegación-por-superficies-spec-031) y
 [AGENTS.md](AGENTS.md) §51.
 
-- Backend verificado el 2026-09-28: **2.968 pytest pass / 23 skipped**; el único fallo
-  es la prueba `test_suggest_perf` de SPEC-001, flaky conocido bajo carga, que queda
-  **verde aislada** (2 passed). Contra **PostgreSQL 18.6 real**: migraciones `000`–`023`
-  aplicadas e idempotentes y **19 passed** en el contrato de esquema. ruff + mypy
-  limpios (416 fuentes).
-- Frontend verificado: `tsc`, ESLint y `next build` correctos, con **110 páginas**
-  (6 nuevas de SPEC-031: las landings `/contabilidad`, `/facturacion`, `/informes`,
-  `/fiscal`, `/maestros` y `/maestros/empresas`).
-- Migraciones PostgreSQL `000`–`023` (020 = exportación integral, con unicidad del
+- Backend verificado el 2026-09-29: **3.055 pytest passed / 24 skipped**; el único
+  fallo es la prueba `test_suggest_perf` de SPEC-001, flaky conocido bajo carga, que
+  queda **verde aislada** (2 passed). Contra **PostgreSQL 18.6 real**: migraciones
+  `000`–`024` aplicadas e idempotentes y **20 passed** en el contrato de esquema. ruff
+  + mypy limpios (416 fuentes).
+- Frontend verificado: `tsc`, ESLint y `next build` correctos, con **92 páginas
+  estáticas** (6 nuevas de SPEC-031: las landings `/contabilidad`, `/facturacion`,
+  `/informes`, `/fiscal`, `/maestros` y `/maestros/empresas`).
+- Migraciones PostgreSQL `000`–`024` (020 = exportación integral, con unicidad del
   número por (empresa, año), un único manifiesto y un único blob por exportación,
   `ConfigSii` por empresa y triggers `chk_exportacion_immutable_*` más los append-only
   de manifiesto y blob; 021 = documentos adjuntos al asiento, con unicidad de huella
   `(empresa_id, journal_entry_id, sha256)`, FK compuesta al diario e inmutabilidad real
-  del contenido; 022 = favoritos por usuario y empresa; 023 = seed de demostración).
+  del contenido; 022 = favoritos por usuario y empresa; 023 = seed de demostración;
+  024 = conciliación bancaria, **añadida en 2026-09-29**, ver
+  [Conciliación bancaria](#conciliación-bancaria-spec-013)).
 - CI: `.github/workflows/ci.yml` ejecuta PostgreSQL + pytest, ruff, mypy, typecheck,
   ESLint y build frontend.
 - Pendiente: no queda ninguna spec diseñada sin implementar. El trabajo
@@ -266,6 +268,24 @@ títulos de las secciones y no se podía entrar en ningún proceso. Ver
   (`crear_empresa` / `sembrar_empresa_pgc` / `crear_empresas` /
   `sembrar_empresas_pgc`, con cremalla en `test_guard_siembra_empresa.py`); ver
   [AGENTS.md](AGENTS.md) §47.
+
+### Con lo que se topó uno al usar la aplicación: 27 tablas sin migración
+
+Las specs se cierran contra SQLite, donde `create_all` crea las tablas que faltan.
+Contra PostgreSQL real, una tabla sin migración **no existe**, y la pantalla que la
+usa responde 500. Entre 2019-09 y 2026-09 esto pasó con **27 tablas** de ocho specs
+(005, 007, 008, 010, 011, 012, 014 y 020): facturas, líneas de factura, series,
+terceros, vencimientos, cobros, inmovilizado, remesas SEPA, extractos de libros de
+IVA y cuentas anuales.
+
+Medido el 2026-09-29. La lista completa, y las specs que la tienen pendiente, están
+en `backend/tests/unit/test_migrations.py::TABLAS_SIN_MIGRACION`, protegida por dos
+guards que impiden que la lista crezca o que mienta. El guard que la inventaría cruza
+los `__tablename__` de los modelos con los `CREATE TABLE` de las migraciones, y por
+eso un modelo nuevo sin migración se ve al escribirlo y no seis meses después.
+
+Detalle en [AGENTS.md](AGENTS.md) §52.3.
+
 
 
 ### Documentos adjuntos al asiento (SPEC-030)
@@ -347,6 +367,50 @@ Detalle completo en [AGENTS.md](AGENTS.md) §51 y en
 `specs/031-navegacion-superficies/tasks.md`.
 
 
+### Menú de sesión (SPEC-031, 2026-09-29)
+
+El nombre de usuario de la zona de contexto era un `<span>` de texto: mostraba
+quién eras y no ofrecía ninguna acción. **Cerrar sesión no existía en ninguna parte de
+la aplicación** —para salir había que vaciar el `localStorage` a mano—. Ahora el
+nombre es un botón, y su menú reúne las tres acciones: **cambiar de empresa**,
+**cambiar de ejercicio** y **cerrar sesión**, en escritorio y en la hoja de móvil.
+
+Los dos selectores rápidos de la izquierda **se quedan**: son el camino rápido y
+llevan cosas que el menú no puede contender (el contador de asientos por ejercicio, el
+atajo al ejercicio anterior abierto, y el motivo por el que un ejercicio cerrado no es
+seleccionable). El menú se añade, no sustituye.
+
+Un detalle que no es cosmetico: al cerrar sesión se borra el ejercicio seleccionado
+**antes** que la empresa activa, porque el almacén de ejercicios está indexado por
+empresa. Al revés, el ejercicio que eligió el usuario anterior se queda guardado y el
+siguiente usuario de la misma máquina abre la aplicación en él.
+
+### Conciliación bancaria (SPEC-013)
+
+Importa el extracto del banco, propone cruces con el diario, calcula la diferencia y
+archiva el período. Tres cosas que conviene saber:
+
+**Acepta tres formatos**, y el desplegable los ofrece los tres: `Norma 43/19` (el
+fichero de ancho fijo), `CSV normalizado` y **`XLSX de banco`**, que es el que da el
+área de clientes de la banca electrónica (Santander y los que copian su plantilla).
+El formato se ajusta solo al fichero que se elige, y un formato que no existe se
+rechaza diciendo **cuáles sí**, en vez de intentar leerlo con el parser equivocado.
+
+**El XLSX no trae saldo inicial.** Trae una columna con el saldo *después* de cada
+movimiento, y esa columna hace el papel del registro de control de la norma 43: si
+encadena, los dos saldos salen de ella; si no —un movimiento de más, uno de menos— el
+extracto se rechaza en vez de dar por bueno un cuadre que no existe. El signo va
+dentro del propio importe (los cargos son negativos) y las fechas vienen como texto
+`DD/MM/AAAA`.
+
+**La cuenta 572 hay que indicarla a mano.** El XLSX trae el IBAN, que no es un código
+del plan de cuentas. La interfaz lo avisa antes de subir en vez de devolver un error
+después. Un extracto que no esté en euros se rechaza: el extracto no lleva tipo de
+cambio, así que importarlo tal cual daría cifras falsas.
+
+Detalle completo en [AGENTS.md](AGENTS.md) §52 y en [correcciones.md](correcciones.md).
+
+
 ## Tests
 
 La suite se ejecuta con pytest sobre SQLite en memoria (`backend/tests/`). Para
@@ -421,13 +485,24 @@ El recuento vivo esta en [pendientes.md](pendientes.md).
 
 ### Acceso y Credenciales de Demostración
 
-La base de datos incluye por defecto un usuario administrador y una empresa de pruebas para poder interactuar de inmediato con todas las pantallas:
+La base de datos incluye por defecto un usuario administrador y una empresa de pruebas
+para poder interactuar de inmediato con todas las pantallas:
 
 - **URL Frontend:** `http://localhost:3000`
 - **Usuario:** `admin@contabilidad.es`
 - **Contraseña:** `admin123`
 - **Empresa activa:** `Empresa Demo S.L.` (NIF: `B12345678`)
 - **Ejercicio fiscal activo:** `2026`
+
+> **Aviso (2026-09-29): estas credenciales no funcionan.** El hash bcrypt del seed
+> `migrations/023_seed_demo.sql` está bien formado pero **no es** el de `admin123`
+> (`bcrypt.checkpw('admin123', hash)` devuelve `False`), así que el login responde 401
+> con la contraseña que este README documenta. Es un defecto del seed, no de la
+> autenticación. Puesto que corregirlo implica tocar una migración ya aplicada, lo
+> propio es una migración nueva que reescriba la fila; está anotado en
+> [correcciones.md](correcciones.md) §4 (punto 5) y no se ha hecho porque es un cambio
+> de credenciales que no se ha pedido. Mientras tanto, da de alta el usuario con el
+> servicio real (ver [Primer usuario](#primer-usuario) más abajo).
 
 ### Arranque rápido
 

@@ -40,7 +40,6 @@ PENDIENTES: frozenset[str] = frozenset(
         "integration/test_budget_tenant_isolation.py",
         "integration/test_cierre_aislamiento.py",
         "integration/test_cierre_atomico.py",
-        "integration/test_conciliacion_http.py",
         "integration/test_editar_aislamiento.py",
         "integration/test_informes_full_tenant_isolation.py",
         "integration/test_invoice_aislamiento.py",

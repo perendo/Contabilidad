@@ -39,15 +39,23 @@ los tres roles disponibles para probar el filtrado de permisos.
 
 ## R1 · Identidad antes que nada (FR-001, FR-002)
 
-**Qué hacer**: cerrar sesión. Escribir `/asientos/diario` en la barra de direcciones y pulsar
+**Qué hacer**: iniciar sesión, pulsar el nombre de usuario de la zona de contexto y elegir
+**Cerrar sesión**. Después escribir `/asientos/diario` en la barra de direcciones y pulsar
 Enter.
 
-**Se espera**: redirección inmediata a `/login` **sin pintar** la estructura de la página. Ningún
+**Se espera**: el menú se cierra y aparece la pantalla de identificación; después,
+redirección inmediata a `/login` **sin pintar** la estructura de la página. Ningún
 rail, ningún selector, ningún dato.
 
 Repetir con `/asientos`, `/vencimientos` y `/contabilidad`: las cuatro redirigen.
 
-**Comprueba**: FR-001, FR-002.
+**Comprueba**: FR-001, FR-002, FR-032.
+
+> **Añadido 2026-09-29**: esta redacción decía «cerrar sesión» sin decir cómo, porque
+> **cerrar sesión no existía en ninguna parte de la aplicación**: el nombre de usuario
+> era un `<span>` de texto, y para salir había que vaciar el `localStorage` a mano. El
+> recorrido era imposible de reproducir tal como estaba escrito, y esa es una forma
+> de que un recorrido de quickstart describa un hueco en vez de una funcionalidad.
 
 ---
 
@@ -65,7 +73,20 @@ año cerrado aparece con tono rojo, la etiqueta `cerrado` y **no** es selecciona
 Comprobar que el estado **no depende solo del color**: con el color desactivado se sigue
 leyendo la etiqueta de texto.
 
-**Comprueba**: FR-002, FR-016, FR-017, y D7 (estado por color solo está prohibido).
+Pulsar el nombre de usuario: se abre el **menú de sesión**, con la identidad completa arriba y
+tres acciones debajo — **Cambiar de empresa**, **Cambiar de ejercicio** y **Cerrar
+sesión**.
+
+- Abrir **Cambiar de empresa**: aparece la lista con la razón social y el NIF de cada
+  empresa, y la activa marcada. Elegir otra cambia empresa y ejercicio a la vez.
+- Abrir **Cambiar de ejercicio**: aparece la lista con año, etiqueta de estado y
+  `n asientos`. Los cerrados salen deshabilitados con el motivo.
+- Con una sola empresa, el apartado lo dice en lugar de abrir una lista de un elemento.
+
+En dispositivo pequeño, la hoja de contexto lleva el mismo menú.
+
+**Comprueba**: FR-002, FR-003, FR-016, FR-017, FR-032, y D7 (estado por color solo está
+prohibido).
 
 ---
 

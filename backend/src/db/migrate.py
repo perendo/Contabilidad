@@ -49,6 +49,9 @@ ORDEN_PREFERENTE: tuple[str, ...] = (
     # que va al final sin hueco que reservar.
     "022_favoritos.sql",
     "023_seed_demo.sql",
+    # SPEC-013 se cerro sin migracion; esta la anade al final, despues de
+    # `account_plan` (001) que es de donde salen las FKs de `cuenta_id`.
+    "024_conciliacion.sql",
 )
 
 

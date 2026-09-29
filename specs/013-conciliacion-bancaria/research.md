@@ -4,12 +4,66 @@
 
 Resoluciones de los unknowns del Technical Context y decisiones de diseño conforme a la constitución y al plan raíz.
 
-## D1. Formato de fichero de extracto (norma 43/19 vs CSV normalizado)
+## D1. Formato de fichero de extracto (norma 43/19, CSV normalizado y XLSX de banco)
 
-- **Decision**: Aceptar el fichero de extracto en **norma 43/19** de ancho fijo (codificación ISO-8859-1), tal como lo genera la banca española, y **CSV normalizado** (código UTF-8 con cabecera) equivalente. El parser es **configurable por layout** (posición de fecha, concepto, importe con signo, referencia) para absorber variantes de entidad sin cambio de código. Ambas variantes se mapean a `MovimientoBancario` y se acumulan en el mismo `ExtractoBancario`.
-- **Rationale**: La spec (FR-001 e Assumptions) exige "formato interoperable (CSV/XLSX según norma 43/19) sin conexión directa a la banca electrónica". El layout de ancho fijo de la norma 43 es el estándar real de la banca española; el CSV cubre entidades/exportadores sin norma 43.
-- **Alternatives considered**: Solo CSV (pierde el estándar bancario); parseo rígido de la norma 43 (rompe con variantes de entidad). UE: formato XLSX/qif desestimados por no estar en la spec.
-- **NEEDS CLARIFICATION**: Confirmar el/los layout(s) exactos a soportar en la primera implantación (entidad concreta) y si `XLSX` es imprescindible o basta norma 43/CSV.
+- **Decision**: Se aceptan **tres** formatos. (1) **Norma 43/19** de ancho fijo (ISO-8859-1, 100 caracteres por línea), tal como lo genera la banca española. (2) **CSV normalizado** (UTF-8 con cabecera). (3) **`xlsx_bancario`**: la hoja de cálculo que descarga el área de clientes de la banca electrónica española. Los tres se mapean a `MovimientoBancario` y se acumulan en el mismo `ExtractoBancario`. El catálogo de formatos vive en `services/reconciliation/layouts.py::LAYOUTS`, que es la **única** lista: la API valida contra ella y el desplegable del frontend la replica, con un guard (`tests/unit/test_extracto_layouts.py`) que comprueba que las dos digan lo mismo.
+- **Rationale**: La spec (FR-001 e Assumptions) exige "formato interoperable (CSV/XLSX según norma 43/19) sin conexión directa a la banca electrónica". El layout de ancho fijo de la norma 43 es el estándar real de la banca española; el CSV cubre entidades y exportadores sin norma 43; y el XLSX es lo que **de verdad** entrega la banca hoy en su área de clientes. La primera redacción de esta decisión **(2026-09-16) decía** «formato XLSX/qif desestimados por no estar en la spec» y dejaba un `NEEDS CLARIFICATION` sin responder. El caso real resultó ser el tercero: sin XLSX, la spec se cerraba con una funcionalidad que el usuario no podía usar.
+- **Alternatives considered**: Solo CSV (pierde el estándar bancario); parseo rígido de la norma 43 (rompe con variantes de entidad); XLSX (desestimado entonces, **aceptado después**: ver abajo). qif sigue descartado: no lo exporta la banca española.
+
+### D1-bis. Características del XLSX de banco y cómo se lee (añadido 2026-09-29)
+
+El XLSX del banco no es un fichero de ancho fijo, y su forma obliga a decisiones que
+no existen en la norma 43. Medidas sobre `Data/1. MovimientosCuenta ene_feb26.xlsx`
+(Santander, enero–febrero de 2026, 116 movimientos):
+
+| Característica | Valor real | Decisión de parser |
+|---|---|---|
+| Bloque de metadatos | 7 filas encima (titular, saldos, IBAN, rango de fechas) | La cabecera **se busca** en las 40 primeras filas por nombres de columna normalizados (sin acentos, sin espacios, en minúscula), no se asume en la fila 1. La comparación sin tildes es lo que hace que un banco que lasquite no deje de importar. |
+| Fechas | Texto `DD/MM/AAAA` (no son fechas de Excel, pese a que el formato de celda diga `mm-dd-yy`) | Se aceptan cuatro formas: texto `DD/MM`, texto ISO `AAAA-MM-DD`, `datetime` y `date`. Las tres separaciones son inequívocas. |
+| Signo | **Va dentro del importe**: los cargos son negativos | `importe = abs(valor)` y `signo = "D" si valor < 0`. El modelo exige `importe > 0` (CHECK) y el signo va en su propia columna. |
+| Saldos | Una columna `Saldo` con el saldo **posterior** a cada movimiento | **No hay `saldo_inicial`.** Ver más abajo. |
+| Orden | Del más reciente al más antiguo | Se invierte a cronológico, que es como se leen las otras dos variantes y como se lee un extracto en papel. |
+| Divisa | Columna `Divisa` (se repite: la del importe y la del saldo) | Se rechaza si no es EUR (`divisa_no_soportada`). |
+| Referencia | `Número de documento` es útil; `Referencia 1`/`2` vienen rellenas a ancho fijo con espacios de relleno | Se toma el número de documento; si no, las referencias **recortadas**; si no, el código de operación. |
+| IBAN | En el bloque de metadatos (`C6`) | Se devuelve en `ExtractoDTO.iban` y se muestra en el error de `cuenta_requerida`. **No se usa como cuenta**: un IBAN no es un código del plan, y la aplicación no tiene (ni debe tener) una tabla IBAN → cuenta, porque eso es un maestro de bancos que no existe en ninguna spec. |
+
+**El saldo inicial, que es la pieza no obvia.** El XLSX no lo trae: trae el saldo
+*después* de cada movimiento. Esa columna hace el papel que en la norma 43 hace el
+registro de control `98`, y de ahí salen los dos saldos con una sola comprobación:
+
+```
+s[i] - importe[i] == s[i + 1]     para todo i     (orden descendente)
+```
+
+Si la columna está bien, los saldos encadenan. Si no —un movimiento de más, uno de
+menos, un importe mal pegado— se rompe la cadena y **el extracto se rechaza**: es la
+misma garantía del registro `98`, conseguida sin registro de control porque la columna
+de saldos lo hace sola. Se aceptan las dos ordenaciones porque un exportador propio
+entregaría lo contrario, y se deduce cuál encaja en vez de mirar la primera fecha.
+
+Sobre el fichero real: saldo inicial `1863,7400`, final `5281,9900`, y
+`Σ movimientos = 3418,2500 = 5281,9900 − 1863,7400`. Cuadra.
+
+**Precisión (`Decimal`, nunca `float`).** Las celdas del XLSX llegan como `float`
+porque las ha escrito el banco. `Decimal(5281.99)` es el valor binario exacto,
+`5281.989999999999781...`, no el importe del banco; `Decimal(str(5281.99))` sí lo es,
+porque `str` de un flotante devuelve la cadena decimal más corta que vuelve a ese
+mismo flotante. Se cuantiza a 4 decimales, que es la escala de `NUMERIC(18,4)`
+(regla fiscal). Mismo criterio que `importexport.parseador.parse_decimal` al otro
+lado del proyecto.
+
+**Despacho estricto.** `parse_extracto` **rechaza** un `layout` desconocido en vez de
+caer en la norma 43 por defecto. Con el despacho silencioso, un valor mal escrito
+(un typo, un vacío, un `xlsx` en vez de `xlsx_bancario`) acababa en el parser de
+ancho fijo y respondía `Línea 1: longitud 22 != 100`, que no dice nada del problema
+real. La API valida antes de leer el fichero y devuelve 422 `layout_desconocido` **con
+la lista de los que sí valen**.
+
+- **NEEDS CLARIFICATION (cerrado)**: «si `XLSX` es imprescindible o basta norma
+  43/CSV». Resuelto el 2026-09-29: es imprescindible en la práctica, porque es lo
+  que entrega la banca. Queda abierto únicamente el *layout exacto por entidad*:
+  el layout implementado es el de la banca española, y cualquier banco con otra
+  plantilla necesitará un `LAYOUTS` más, no un parser nuevo.
 
 ## D2. Detección de duplicados de extracto
 

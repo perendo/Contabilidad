@@ -186,10 +186,14 @@ Cada spec tiene en su `tasks.md` una tabla **Trazabilidad FR ↔ User Story** y 
 
 ```powershell
 # Validación (desde backend/)
-..\.venv\Scripts\python.exe -m pytest                       # 2968 passed, 23 skipped; perf verde aislado
+..\.venv\Scripts\python.exe -m pytest                       # 3055 passed, 24 skipped; perf verde aislado
 ..\.venv\Scripts\python.exe -m ruff check src tests         # lint
-..\.venv\Scripts\python.exe -m mypy -p api -p models -p services -p database -p base -p db -p main -p config   # typecheck (406 fuentes)
+..\.venv\Scripts\python.exe -m mypy -p api -p models -p services -p database -p base -p db -p main -p config   # typecheck (416 fuentes)
 ```
+
+> Las cifras de arriba son las de §52 (2026-09-29). Las de las secciones anteriores
+> son la foto de su momento y se dejan como están: cada cierre de sesión las
+> actualizó en su día y son el registro de cómo se llegó aquí.
 
 - mypy está configurado en `backend/mypy.ini` (`mypy_path = src`). Ejecutarlo siempre desde `backend/` con targets por módulo vía `-p` (`-p api -p models -p services -p database -p base -p db`) para evitar el duplicado `src.*` vs `*` (mypy >= 2.3 no resuelve nombres desnudos como módulos).
 - Sobre Windows PowerShell 5.1: no usar `&&`; encadenar con `cmd1; if ($?) { cmd2 }`.
@@ -339,7 +343,7 @@ La verificación real de SPEC-020 detectó que, aunque las 69 tareas estaban mar
 
 ```powershell
 # Backend (desde backend/)
-..\.venv\Scripts\python.exe -m pytest                    # 2968 passed, 23 skipped (SQLite; migraciones 000-021 sobre PG)
+..\.venv\Scripts\python.exe -m pytest                    # 3055 passed, 24 skipped (SQLite; migraciones 000-024 sobre PG)
 ..\.venv\Scripts\python.exe -m ruff check src tests      # All checks passed
 ..\.venv\Scripts\python.exe -m mypy -p api -p models -p services -p database -p base -p db -p main -p config
 # Servidor
@@ -349,8 +353,11 @@ $env:PYTHONPATH="src"; ..\.venv\Scripts\python.exe -m uvicorn main:app --reload
 npm install
 node node_modules/typescript/bin/tsc --noEmit
 node node_modules/eslint/bin/eslint.js src
-$env:NEXT_TELEMETRY_DISABLED="1"; node node_modules/next/dist/bin/next build   # 104 rutas
+$env:NEXT_TELEMETRY_DISABLED="1"; node node_modules/next/dist/bin/next build   # 92 paginas estaticas
 ```
+
+> `next build` **no** se lanza con un `next dev` vivo: las dos puertas escriben en el
+> mismo `.next` y ya rompió el login una vez (§51).
 
 ## 19. PostgreSQL local (verificación real de migraciones)
 
@@ -430,6 +437,15 @@ documentadas.
 | 028 Cierre intermedio/reapertura | 57/57 | `models/closing/{periodo_cerrado,balanza_periodo,cierre_ejercicio,solicitud_reapertura,secuencia_reapertura}`, `services/closing/{errores,reglas_cierre,balanza,periodo,cierre_anual,reapertura,secuencia}`, `api/closing.py`, migración 019 + trigger `chk_journal_entry_fecha_abierta`, `components/closing/{api.ts,BalanzaTabla.tsx}`, `app/cierres/{page,intermedio,anual,reaperturas,[id]}` | 🟢 completa |
 | 029 Exportacion integral | 52/52 | `models/export/*`, `services/export/{bloques,recopilar,serializacion,manifiesto,zip_generator,persistir,verificar,sii}`, `api/export.py`, migracion 020 + trigger de inmutabilidad del snapshot, `components/export/{api.ts,ManifiestoEstado.tsx,DescargaExport.tsx}`, `app/exportaciones/{page,nueva,[id]}` | COMPLETA |
 | 030 Documentos adjuntos | 48/48 | `models/acct/documento.py`, `services/documentos/{errores,validacion,_serializacion,adjuntos,consulta,bajas}`, `api/documentos/{__init__,deps,adjuntos,consulta,bajas}`, migracion 021 + 2 triggers, `components/documentos/{api.ts,DocumentosAsiento.tsx,VisorDocumento.tsx}`, `app/documentos/{page}` + montaje en `app/asientos/[id]/page.tsx` | COMPLETA |
+| 031 Navegacion y superficies | 74/74 | `models/navigation/favorito.py`, `services/navigation/*`, `api/navigation.py`, migracion 022, `components/navigation/*`, `src/middleware.ts` | COMPLETA |
+
+> **Actualizado en §52 (2026-09-29)**: la fila de SPEC-013 decia "sin migracion SQL"
+> y eso era el defecto: sus 6 tablas no existian en PostgreSQL y toda la
+> conciliacion devolvia 500. Anadida la migracion `024_conciliacion.sql` y el parser
+> `xlsx_bancario`. Las specs de la tabla que **tienen** su justificacion pero siguen sin
+> migracion son 005, 007, 008, 010, 011, 012, 014 y 020: sus 27 tablas solo existen
+> por `create_all` y devuelven 500 igual. Inventario en
+> `test_migrations.py::TABLAS_SIN_MIGRACION`.
 
 ### Bloqueantes transversales (no figuran en ninguna `tasks.md`)
 
@@ -1907,6 +1923,13 @@ Trigésima spec cerrada (48/48). Total del proyecto: **1.432/1.432 tareas**.
   por la API, el guard de sesion del frontend es optimista (no de seguridad), y las
   superficies no tienen gestion de altas ni de bajas de sus destinos.
 
+> **Actualizado en §52 (2026-09-29)**: a esa lista de tres huecos se les anade un
+> cuarto, y es el mas grave de todos porque afecta a la aplicacion real, no a la
+> navegacion: **27 tablas del ORM no tienen migracion SQL** y devuelven 500 en
+> PostgreSQL (facturas, terceros, vencimientos, remesas SEPA, inmovilizado, libros de
+> IVA). Inventariadas en `test_migrations.py::TABLAS_SIN_MIGRACION` y con la lista
+> protegida por dos guards. Ver §52.3.
+
 ## 47. Trabajo transversal: siembra de empresas en tests (2026-09-27)
 
 Cierra el unico pendiente que quedaba tras SPEC-030 (§46). No es una spec: es
@@ -2480,3 +2503,270 @@ Comprobacion de estado, la que mas veces salva tiempo:
 foreach($p in 3000,8000){ if(Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue){ "$p escuchando" } else { "$p LIBRE" } }
 Get-Process node,python -ErrorAction SilentlyContinue | Select-Object Id,StartTime
 ```
+
+
+## 52. Importar el XLSX del banco, menu de sesion y la migracion que faltaba (2026-09-29)
+
+Trabajo **fuera del ciclo de specs**, a peticion del usuario sobre la aplicacion en
+funcionamiento. Detalle completo, con la razon de cada decision, en
+[`correcciones.md`](correcciones.md). Aqui el resumen y las lecciones.
+
+Tres bloques: los dos que se pidieron, y un tercero que no estaba en el encargo y
+que hacia inutil el primero.
+
+### 52.1 Â· El XLSX del banco (SPEC-013)
+
+`Data/1. MovimientosCuenta ene_feb26.xlsx` no se podia importar **por ninguna via**, y
+no por un error concreto sino porque el formato no estaba soportado en ninguna capa:
+
+| Capa | Estado antes | Fichero |
+|---|---|---|
+| `accept` del navegador | `.txt,.csv` â€” el `.xlsx` no aparecia ni en el dialogo | `frontend/src/app/conciliacion/importar/page.tsx:59` |
+| Desplegable de formato | dos opciones: `norma_43_1919`, `csv_normalizado` | ibidem, 70â€“71 |
+| API | `layout` era un `str` **sin validar** | `backend/src/api/reconciliation.py:117` |
+| Parser | despacho `csv` -> CSV, **todo lo demas** -> norma 43 | `services/reconciliation/parsers.py:212-215` |
+
+Los tres caminos de error contestaban `Linea 1: longitud 22 != 100`: hablando del
+**ancho de linea de un fichero que no es de ancho fijo**. Subirlo con `layout=xlsx`
+tampoco funcionaba, porque `xlsx` no era un valor valido y caia en la norma 43 por el
+mismo `if`.
+
+**No era un olvido.** `research.md` de SPEC-013 (lineas 10â€“12) lo habia
+desestimado con un `NEEDS CLARIFICATION` sin responder: *Â«y si `XLSX` es
+imprescindible o basta norma 43/CSVÂ»*. La spec asumio que la banca daria norma 43 o
+CSV. El caso real resulto ser el tercero.
+
+#### El formato real, y lo que obliga
+
+El XLSX de un banco no es un fichero de ancho fijo:
+
+| Caracteristica | Valor real | Consecuencia en el parser |
+|---|---|---|
+| Bloque de metadatos | 7 filas encima (titular, saldos, IBAN, rango) | la cabecera **se busca** en las 40 primeras filas |
+| Fechas | texto `DD/MM/AAAA` (no son fechas de Excel, pese al `mm-dd-yy` de la celda) | se aceptan 4 formas: `DD/MM`, ISO, `datetime`, `date` |
+| Signo | **va dentro del importe**: los cargos son negativos | `abs(importe)` y `signo = "D" si valor < 0` |
+| Saldos | una columna `Saldo` con el saldo **posterior** a cada movimiento | no hay `saldo_inicial`: hay que derivarlo |
+| Orden | del mas reciente al mas antiguo | se invierte a cronologico, como las otras dos variantes |
+| Divisa | columna `Divisa`, repetida (la del importe y la del saldo) | se rechaza si no es EUR |
+
+**Lo del saldo inicial es lo no obvio, y es la pieza que hace que el formato sea
+fiable.** El XLSX no lo trae: trae el saldo despues de cada movimiento. Esa columna
+hace el papel que en la norma 43 hace el registro de control `98`, y de ahi salen
+los dos saldos con una comprobacion:
+
+```
+s[i] - importe[i] == s[i + 1]     para todo i     (orden descendente)
+```
+
+Si la columna esta bien, los saldos encadenan. Si no â€” un movimiento de mas, uno de
+menos, un importe mal pegado â€” se rompe la cadena y **el extracto se rechaza**: es la
+misma garantia del registro `98`, conseguida sin registro de control porque la
+columna de saldos lo hace sola. Se aceptan las dos ordenaciones porque un exportador
+propio entregaria lo contrario, y se deduce cual encaja en vez de mirar la primera
+fecha.
+
+Resultado sobre el fichero real: **116 movimientos**, del `2026-01-02` al
+`2026-02-27`, saldo inicial `1863,7400`, final `5281,9900`, cuadre exacto.
+
+Cambios: `layouts.py` gana el catalogo `LAYOUTS` (que **no existia**: solo estaban
+los que el parser discerning), `parsers.py` gana `parse_xlsx_bancario()` y 8
+ayudantes, `api/reconciliation.py` gana `_validar_layout()` con 422 y la lista de los
+que si valen, e `importacion.py` pone el IBAN y el `layout` en el `payload` de
+auditoria. En el frontend, la tercera opcion, el `accept` con `.xlsx`, el formato que
+**sigue al fichero** elegido y el aviso de que la cuenta hay que ponerla a mano.
+
+**El IBAN no es una cuenta.** Un IBAN no es un codigo del plan, y la aplicacion no
+tiene (ni deberia tener) una tabla IBAN -> cuenta, porque eso es un maestro de bancos
+que no existe en ninguna spec. Por eso el campo Â«Cuenta 572Â» sigue siendo
+obligatorio, y ahora la interfaz lo dice **antes** de subir.
+
+### 52.2 Â· Menu de sesion (SPEC-031, SPEC-003)
+
+La zona de contexto mostraba empresa, ejercicio y usuario, y el usuario no tenia
+ninguna accion: su nombre era un `<span>`, y **cerrar sesion no existia en ninguna
+parte de la aplicacion**. Para salir habia que vaciar `localStorage` a mano.
+
+Nuevo `SessionMenu.tsx`, montado en `ContextZone` **dos veces** (escritorio y hoja de
+compacto) con: cambiar empresa (lista con NIF y la activa marcada), cambiar ejercicio
+(aÃ±o, etiqueta de estado y `n asientos`; los cerrados deshabilitados con el motivo) y
+cerrar sesion.
+
+Dos cosas no obvias, escritas en el codigo y fijadas por guard:
+
+- **El orden del cierre.** `limpiarSesion()` borra la empresa activa, y
+  `setEjercicioActivo(null)` solo puede borrar la entrada del mapa si todavia sabe de
+  que empresa es. Al reves, el ejercicio se queda y el siguiente usuario de la misma
+  maquina abre la aplicacion en el ejercicio que eligio el anterior.
+- **La presentacion del estado no se reimplementa.** FR-031 dice que el estado no
+  puede depender solo del color. `etiqueta()` y `clase()` se **exportan** de
+  `ExerciseSwitcher.tsx` y el menu las importa: dos copias de esa regla se separan en
+  cuanto una de las dos se toca.
+
+**Lo que el menu no hace**, y por que: cambiar de empresa o de ejercicio se pide a
+`useSesion().cambiarEmpresa` / `cambiarEjercicio`, no se escribe ahi. Esos saben que
+hay que escribir el almacen **antes** de recargar, porque la cabecera
+`X-Empresa-Activa` viaja con la propia peticion que recarga. Reescribirlo en el menu
+seria copiar el orden correcto en un sitio donde nadie lo documentaria. Y los dos
+selectores rapidos de la izquierda **se quedan**: llevan el contador de asientos, el
+atajo al ejercicio anterior y la explicacion de por que un cerrado no es elegible.
+
+### 52.3 Â· Las 6 tablas de SPEC-013 no existian en PostgreSQL
+
+**Este es el bloque que no estaba en el encargo y que hacia inutil el 52.1.**
+
+SPEC-013 se cerro el 2026-09-19 con **54/54 tareas** y todas sus puertas en verde. Sus
+seis tablas â€”`extracto_bancario`, `movimiento_bancario`, `conciliacion`,
+`cruce_conciliacion`, `periodo_conciliado`, `alerta_conciliacion`â€” **no existian en la
+base de datos real**. Vivian solo en el `Base.metadata.create_all` de cada test de
+SQLite. Medido sobre PostgreSQL 18.6: 0 de 6.
+
+En produccion, `POST /api/v1/extractos` devolvia **500** con `UndefinedTableError`, y
+toda la superficie de conciliacion era inservible. El arreglo 52.1 habria pasado
+`pytest`, `ruff`, `mypy`, `tsc`, ESLint y `next build` y seguido devolviendo 500.
+
+**Por que ninguna puerta lo vio.** `test_migrations.py` comprueba que las
+migraciones **declaradas** esten en el inventario, y que el orden por dependencias
+cuadre. No comprueba que cada tabla del ORM tenga una. Un modelo sin migracion no
+esta en el inventario, asi que no hay nada que faltar. Lo agravo que en las 20 specs
+posteriores a SPEC-013 **cada una** anadio su migracion y nadie notara que faltaba la
+de una anterior: la puerta crecio sin que la deuda se acumulara visible.
+
+**Arreglado** con `migrations/024_conciliacion.sql`: 9 enums, las 6 tablas, 2 CHECK de
+cuadre, 5 FKs compuestas por `empresa_id`, unicidad de `sha256` por empresa (la
+deduplicacion a nivel de esquema, no solo en el servicio) y 4 triggers. Registrada en
+`ORDEN_PREFERENTE` y en `ESPERADAS`, y aÃ±adida a `TABLAS_ESPERADAS` de los contratos.
+`db.migrate` 24/24, y la segunda pasada no hace nada.
+
+#### El trigger que casi rompe la conciliacion
+
+La primera version hacia `movimiento_bancario` **append-only**, rechazando cualquier
+`UPDATE`. Es exactamente lo que esta mal, y **ningun test de SQLite lo cazo** porque
+alli esas tablas no tienen trigger.
+
+El motivo: `services/reconciliation/cruce.py:129` hace
+`mov.estado = EstadoMovimiento.conciliado` al confirmar un cruce, y la linea 173 lo
+devuelve a `pendiente` al deshacerlo. Un trigger que reventase el `UPDATE` entero
+habria hecho la conciliacion **inservible**, que es justo su funcion. Se detecto al
+leer la respuesta del `DELETE` en la prueba de humo, no al escribir el SQL.
+
+El trigger definitivo compara **columna a columna**: `importe`, `signo`, `fecha_*`,
+`concepto`, `referencia`, `orden` y `extracto_id` no se tocan; `estado` si, porque es
+una columna de flujo de trabajo y no contenido del banco. Un guard fija que columnas
+compara y que `estado` **no** esta entre ellas.
+
+#### La puerta que faltaba, y que es lo que de verdad cuenta
+
+Cinco guards nuevos en `test_migrations.py`, **los cinco vistos fallar** al
+reintroducir su defecto:
+
+| Defecto reintroducido | Que falla |
+|---|---|
+| La migracion no crea `movimiento_bancario` | `test_toda_tabla_del_orm_tiene_migracion` + `test_la_migracion_de_conciliacion_crea_las_seis_tablas` |
+| Un modelo nuevo en `src/models/` sin migracion | `test_toda_tabla_del_orm_tiene_migracion` |
+| El trigger vuelve a reventar cualquier `UPDATE` | `test_la_migracion_de_conciliacion_admite_cruzar_un_movimiento` |
+| `ADD CONSTRAINT` sin la guardia de idempotencia | `test_las_migraciones_son_idempotentes_tras_aplicadas` |
+| 024 fuera de `ORDEN_PREFERENTE` | `test_el_inventario_coincide_con_orden_preferente` |
+
+La importante es la primera: **`test_toda_tabla_del_orm_tiene_migracion` cruza los
+`__tablename__` de `src/models/` con los `CREATE TABLE` de `migrations/`**. Con eso la
+clase de defecto Â«un modelo nuevo sin migracionÂ» es la primera que se ve.
+
+**Y un limite honesto de ese guard.** Con el fichero `024` quitado de disco,
+`test_migraciones_crean_tablas` de PostgreSQL **no** fallo: el fixture `pg_engine`
+aplica las migraciones sobre la base de verdad **sin borrar el esquema**, y las tablas
+seguian ahi de la pasada anterior. Solo fallaron los guards de fichero. Por eso el
+guard nuevo mira el **codigo** en vez de la base: es el que no depende de en que
+estado este la base.
+
+#### Deuda que este guard destapo, y que NO se ha pagado
+
+El guard inventario las tablas del ORM sin migracion. Salen **27**, de
+SPEC-005/007/008/010/011/012/014/020:
+
+```
+activo_inmovilizado      amortizacion_generada    baja_activo          blob_fichero
+clasificacion_efe        cobro_conciliado        cobro_pago            condicion_pronto_pago
+configuracion_informe    configuracion_sii        devolucion_recibo     exportacion_modelo
+factura                  factura_linea            formulacion_cuentas_anuales
+iva_diferido_caja        mandato_sepa             periodo_fiscal        plan_amortizacion
+recibo_remesa            reclamacion             remesa                secuencia_remesa
+serie_factura            tercero                 tercero_subcuenta     vencimiento
+```
+
+**No se han migrado.** Facturacion, terceros, remesas SEPA, inmovilizado y los libros
+de IVA son features enteras: es trabajo de un dia por spec, no un apendice de esta
+correccion. Lo que si se ha hecho es dejar la lista en `TABLAS_SIN_MIGRACION`, con
+dos guards que obligan a que la lista **no mienta en ninguna de las dos direcciones**
+(que no nombre tablas ya migradas, ni tablas que ya no existen en los modelos). Es el
+mismo patron que `PENDIENTES` en `test_guard_siembra_empresa`.
+
+**Consecuencia para el usuario, dicha con todas sus letras**: en la aplicacion real,
+importar facturas, remesas, vencimientos o inmovilizado **tambien** devuelve 500, por
+el mismo motivo y desde hace tiempo. Lo de 52.3 solo devuelve la conciliacion.
+
+### 52.4 Â· Verificacion
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa (SQLite) | **3055 passed / 24 skipped**. Unico fallo el flaky conocido `test_suggest_perf` (3,6 s en vez de 500 ms en una de las 9 iteraciones, bajo carga), **2 passed** aislado |
+| `tests/integration/test_pg_schema.py` (PostgreSQL 18.6) | **20 passed** (antes 19) |
+| **Aplicacion real** (HTTP + PostgreSQL) | login 200 -> `layout=xlsx` **422** con la lista -> sin cuenta **422** con el IBAN -> import **201** (116 movimientos) -> reimportar **409** -> detalle 200 -> abrir conciliacion 201 -> propuestas 200 -> cerrar con diferencia != 0 **409**. **Base restaurada**: 0 extractos, 0 movimientos, hash de clave restaurado |
+| Tests nuevos | `test_parser_xlsx` 31, `test_importacion_xlsx` 14, `test_extracto_layouts` 12, `test_navegacion_menu_sesion` 20 |
+| `ruff check src tests` | limpio |
+| `mypy` | limpio, 416 fuentes |
+| `tsc` / ESLint / `next build` | verdes, 92 paginas estaticas, 1 warning preexistente de `ContextZone` |
+
+El fichero `Data/*.xlsx` **no se ha copiado a `tests/fixtures/`**: es un extracto real
+con IBAN y con nombres de terceros, y meterlo en el repositorio es un problema de
+datos personales. Los tests construyen un XLSX sintetico con la misma plantilla
+(`tests/unit/extracto_xlsx_support.py`) y el fichero real se comprueba ejecutando el
+parser contra el. `Data/` esta ahora en `.gitignore`.
+
+### 52.5 Â· Lecciones reutilizables
+
+- **Una puerta que compara el inventario con lo declarado no ve lo que falta.**
+  `test_migrations.py` solo mira las migraciones *declaradas*, y por eso SPEC-013 pudo
+  cerrarse con 54/54 tareas, sus puertas en verde y sus seis tablas sin existir en
+  PostgreSQL. La puerta que faltaba cruza los modelos con el esquema. Es la misma
+  forma del defecto de Â§51 (una puerta que lee la declaracion, no el
+  comportamiento), en un sitio distinto y con un coste de seis meses de specs.
+
+- **Una puerta verde no dice que la cosa funcione en la aplicacion.** Todo el arreglo
+  del XLSX paso las seis puertas antes de descubrir que en la aplicacion real
+  devolvia 500. Lo que faltaba era una prueba contra el PostgreSQL de verdad, y esa es
+  la que destapo el defecto. `tsc`, `ruff`, `mypy` y `next build` no se ejecutan
+  contra la aplicacion; un `curl` si.
+
+- **Un trigger de inmutabilidad que no se ha ejecutado contra el codigo que protege,
+  se equivoca â€” y se equivoca al reventar de mas, no de menos.** Hacer
+  `movimiento_bancario` append-only habria roto confirmar y deshacer un cruce, que es
+  su funcion entera, y ningun test de SQLite lo habria visto porque alli esas tablas no
+  tienen trigger. Los triggers de inmutabilidad tienen que leerse **contra el codigo
+  que Updating los escribe**, no contra la constitucion que dicen cumplir.
+
+- **Editar una migracion ya aplicada obliga a que siga siendo idempotente, y el fixture
+  de PostgreSQL tambien.** `db.migrate` reaplica lo ya aplicado y `pg_engine` aplica
+  sobre la base de verdad sin borrar el esquema: los dos escriben encima. Un
+  `ADD CONSTRAINT` sin guardia revienta con `DuplicateObjectError` en el segundo pase
+  y tumba la migracion entera. Confirmado de forma painful en esta sesion (Â§50 lo
+  avisaba; el aviso era correcto).
+
+- **Un fixture de prueba que se autolimpia es un fixture que se ha ejecutado contra
+  la base de verdad.** La prueba de humo deja la clave del usuario de demo como
+  estaba, borra las filas que creo y dice que lo ha hecho. Sin eso, probar Â«que pasa si
+  subo mi extracto realÂ» habria dejado 116 movimientos y una clave cambiada en la base
+  del usuario. Y dos cosas que **no** se pueden limpiar, y por eso hay que saber de
+  antemano que existen: `audit_log` es WORM (`chk_audit_log_immutable` rechaza el
+  DELETE, y esta bien que lo haga) y el `DELETE` de `movimiento_bancario` esta
+  vetado por trigger, asi que limpiar exige desactivar el trigger a proposito.
+
+- **`Data/` con datos bancarios reales, en un repositorio, es un accidente esperando.**
+  El fichero estaba en el arbol de trabajo sin rastrear. Anadirlo a `.gitignore` es una
+  linea; llegar al commit con el extracto dentro habria required un `filter-branch`
+  despues. Lo mismo vale para `backend/.env`, que ya estaba cubierto (Â§8).
+
+- **La primera puerta que se escribe no es la que mas valor tiene; la que responde a
+  Â«que clase de defecto es estaÂ».** Los cuatro guards del parser de XLSX comprueban
+  que el formato se lea bien. El quinto, `test_toda_tabla_del_orm_tiene_migracion`,
+  comprueba algo mas pequeno y mas general: que ninguna tabla nueva se quede fuera del
+  esquema. Ese es el que habria parado la spec entera.

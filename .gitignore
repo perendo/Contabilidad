@@ -46,3 +46,11 @@ Thumbs.db
 # No se borran: se ignoran, que es reversible.
 journal_debug.txt
 Modelfile
+
+# Extractos bancarios reales.
+# `Data/` es donde se dejan a mano los ficheros que descarga el banco para
+# importarlos y probarlos. Son documentos bancarios de una cuenta real: con IBAN,
+# con movimientos y con los nombres de los terceros. No se suben nunca. Los tests
+# no los necesitan: construyen un XLSX sintetico con la misma plantilla
+# (`backend/tests/unit/extracto_xlsx_support.py`).
+Data/

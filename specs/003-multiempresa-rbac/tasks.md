@@ -249,3 +249,52 @@ Código creado como soporte de SPEC-020; las tareas siguen **sin marcar `[X]`** 
 
 - **Implementado**: T001 (estructura `iam`/`auth`), T002/T004 (`api/deps.py`: `get_current_user`, `get_empresa_id`, `require_role`), modelos `Company`/`User`/`UserCompany`, `004_iam.sql`, `POST /auth/login` y `GET /auth/me`, `GET /companies`.
 - **Pendiente**: US2 cambio de empresa (frontend), US4 alta de empresa, página de login, tests de la feature.
+
+
+---
+
+# Nota 2026-09-29: esta spec no define cierre de sesión
+
+Recogida durante la corrección del menú de sesión de SPEC-031, y **no resuelta**: se
+anota aquí para que no se pierda, no como tarea hecha.
+
+## El hueco
+
+Esta spec define el ciclo de vida de la sesión en el backend: `POST /auth/login`,
+`GET /auth/me`, `POST /auth/switch-company`, alta y listado de empresas, guards de
+empresa y de rol. **No define ningún cierre de sesión**, y no por decisión: la
+funcionalidad no existía. Hasta el 2026-09-29, la aplicación **no tenía forma de
+cerrar sesión** en ninguna parte.
+
+Lo que hay ahora (SPEC-031, `SessionMenu.tsx`) es un cierre **de cliente**: se vacían
+el token de `localStorage` y la cookie de sesión, y se navega a `/login`. Para el
+usuario funciona. Para el modelo de seguridad de esta spec, deja dos huecos:
+
+1. **No hay revocación.** El token JWT expira solo a los 30 min
+   (`ACCESS_TOKEN_EXPIRE_MINUTES`, §44 de `AGENTS.md`), pero no hay lista de
+   revocación ni `POST /logout`: un token robado o un equipo compartido sigue valiendo
+   hasta expirar. Cerrar sesión en el cliente es una cortesía, no una invalidación.
+2. **El `middleware.ts` es un guard optimista** (§46). Solo comprueba que hay cookie de
+   sesión; no valida el token. La frontera real es el 401 del backend, que sí funciona.
+
+## Qué haría falta, y por qué no se ha hecho
+
+Un `POST /api/v1/auth/logout` que reciba el token, lo registre en una tabla de
+revocación (o en un almacén con caducidad, del mismo modo que `password_reset_tokens`
+si lo hubiera) y responda 204 aunque el token ya haya caducado — cerrar sesión tiene
+que funcionar siempre. Y el cliente tendría que llamarlo antes de `limpiarSesion()`.
+
+Es un **cambio de seguridad**, no un arreglo de interfaz, y no se ha pedido. Se anota
+para que lo recoja SPEC-032 (seguridad, gestión de usuarios y autoría del apunte), que
+ya está diseñada y es donde encaja.
+
+## Nota aparte: el seed de demostración
+
+`migrations/023_seed_demo.sql` crea el usuario `admin@contabilidad.es` con un
+comentario que dice «password: admin123», y `README.md` documenta esas credenciales.
+El hash bcrypt del seed está bien formado pero **no es** el de `admin123`
+(`bcrypt.checkpw('admin123', hash)` devuelve `False`), así que el login responde 401
+con la contraseña documentada. Detectado el 2026-09-29 al probar contra la aplicación
+real. Corregirlo obliga a tocar una migración ya aplicada (§50), así que lo propio es
+una migración nueva que reescriba la fila. No se ha hecho porque es un cambio de
+credenciales que no se ha pedido.

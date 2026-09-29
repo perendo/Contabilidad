@@ -122,6 +122,15 @@ TABLAS_ESPERADAS = {
     "blob_exportacion",
     "config_sii",
     "documento_asiento",
+    # SPEC-013. Estaban ausentes: la spec se cerro con todas sus puertas en verde y
+    # estas seis tablas solo existian por `create_all` en SQLite, de modo que en
+    # PostgreSQL la conciliacion era inservible. Anadidas en 024.
+    "extracto_bancario",
+    "movimiento_bancario",
+    "conciliacion",
+    "cruce_conciliacion",
+    "periodo_conciliado",
+    "alerta_conciliacion",
 }
 
 
@@ -1489,3 +1498,203 @@ async def test_favoritos_unicidad_y_fk_de_vinculo_en_postgresql(
             destino="vencimientos",
             orden=1,
         )
+
+
+async def test_conciliacion_tiene_migracion_y_su_trigger_permite_cruzar(
+    pg_engine: AsyncEngine,
+):
+    """Migracion 024: las 6 tablas de conciliacion y su inmutabilidad.
+
+    **Por que este test existe.** SPEC-013 se cerro con 54/54 tareas y todas sus
+    puertas en verde, y aun asi sus tablas no tenian migracion: vivian solo en el
+    `create_all` de los tests de SQLite. Contra PostgreSQL real no existian, de modo
+    que `POST /api/v1/extractos` devolvia 500 y **toda** la superficie de
+    conciliacion era inusable en la aplicacion real. Ninguna puerta lo veia porque
+    `test_migrations.py` solo comprueba que las migraciones *declaradas* esten en el
+    inventario, no que cada tabla del ORM tenga una. Un modelo sin migracion es
+    invisible para esa puerta.
+
+    Lo que se verifica:
+
+    1. Las 6 tablas existen en PostgreSQL. Es la asercion que habria fallado antes.
+    2. `UPDATE ... SET estado` **si** se admite: confirmar un cruce pasa el
+       movimiento a `conciliado` y deshacerlo lo devuelve a `pendiente`
+       (`services/reconciliation/cruce.py`). Un trigger que reventase cualquier
+       UPDATE dejaria la conciliacion inservible, que es justo su funcion.
+    3. `UPDATE` de una columna de contenido (importe, signo, fecha, concepto) se
+       **rechaza**: lo que dice el banco no se reescribe (constitucion II).
+    4. `DELETE` se rechaza siempre, y `periodo_conciliado` es append-only entero.
+    5. `importe > 0` y la unicidad de `sha256` por empresa, que es la deduplicacion
+       de la importacion hecha a nivel de esquema.
+    """
+    empresa = random.randrange(10_000_000, 90_000_000)
+    nif = f"C{empresa % 100_000_000:08d}"
+
+    async with pg_engine.begin() as conn:
+        # 1. Las 6 tablas.
+        existentes = {
+            fila[0]
+            for fila in (
+                await conn.execute(
+                    text(
+                        "SELECT table_name FROM information_schema.tables "
+                        "WHERE table_schema = 'public' AND table_name = ANY(:nombres)"
+                    ),
+                    {"nombres": [
+                        "extracto_bancario", "movimiento_bancario", "conciliacion",
+                        "cruce_conciliacion", "periodo_conciliado", "alerta_conciliacion",
+                    ]},
+                )
+            ).all()
+        }
+        faltan = {
+            "extracto_bancario", "movimiento_bancario", "conciliacion",
+            "cruce_conciliacion", "periodo_conciliado", "alerta_conciliacion",
+        } - existentes
+        assert not faltan, (
+            f"sin migracion en PostgreSQL: {sorted(faltan)}. La migracion 024 "
+            "deberia estar aplicada (`python -m db.migrate`)"
+        )
+
+        await conn.execute(
+            text(
+                "INSERT INTO companies (company_id, nif, razon_social) "
+                "VALUES (:id, :nif, 'Conciliacion SL') ON CONFLICT DO NOTHING"
+            ),
+            {"id": empresa, "nif": nif},
+        )
+        # `cuenta_id` tiene FK a `account_plan`. No hace falta plantar el arbol: al
+        # insertar la empresa, `trg_companies_seed` corre `seed_default_pgc` y deja
+        # el PGC entero, `5720` incluida. Intentar plantar una cuenta suelta choca
+        # con `chk_account_plan_structure`, que exige el padre de cada nivel.
+        cuenta = (
+            await conn.execute(
+                text("SELECT id FROM account_plan WHERE tenant_id = :t AND code = '5720'"),
+                {"t": empresa},
+            )
+        ).scalar()
+        assert cuenta is not None, "el seed del PGC deberia haber creado la cuenta 5720"
+        extracto = uuid.uuid4()
+        movimiento = uuid.uuid4()
+        sha = f"{empresa:064d}"[:64]
+        await conn.execute(
+            text(
+                "INSERT INTO extracto_bancario (id, empresa_id, cuenta_id, fecha_inicio, "
+                "fecha_fin, saldo_inicial, saldo_final, nombre_fichero, sha256, n_movimientos) "
+                "VALUES (:id, :empresa, :cuenta, '2026-01-02', '2026-02-27', 1863.7400, "
+                "5281.9900, 'x.xlsx', :sha, 1)"
+            ),
+            {"id": extracto, "empresa": empresa, "cuenta": cuenta, "sha": sha},
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO movimiento_bancario (id, empresa_id, extracto_id, orden, "
+                "fecha_operacion, concepto, importe, signo) "
+                "VALUES (:id, :empresa, :extracto, 1, '2026-01-02', 'Abono', 1125.0000, 'H')"
+            ),
+            {"id": movimiento, "empresa": empresa, "extracto": extracto},
+        )
+
+    # 2. `estado` SI se puede cambiar: es lo que hace confirmar y deshacer un cruce.
+    async with pg_engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE movimiento_bancario SET estado = 'conciliado' WHERE id = :id"),
+            {"id": movimiento},
+        )
+        estado = (
+            await conn.execute(
+                text("SELECT estado FROM movimiento_bancario WHERE id = :id"),
+                {"id": movimiento},
+            )
+        ).scalar()
+        assert estado == "conciliado"
+    async with pg_engine.begin() as conn:
+        await conn.execute(
+            text("UPDATE movimiento_bancario SET estado = 'pendiente' WHERE id = :id"),
+            {"id": movimiento},
+        )
+
+    # 3. El contenido descargado del banco no se reescribe. Cada `pytest.raises` en su
+    #    propia transaccion a NIVEL DE FUNCION (leccion de la seccion anterior).
+    for columna, valor in (
+        ("importe", "999999.0000"),
+        ("signo", "'D'"),
+        ("concepto", "'Otro concepto'"),
+        ("fecha_operacion", "'2026-03-01'"),
+    ):
+        with pytest.raises(DBAPIError) as exc:
+            async with pg_engine.begin() as conn:
+                await conn.execute(
+                    text(f"UPDATE movimiento_bancario SET {columna} = {valor} WHERE id = :id"),
+                    {"id": movimiento},
+                )
+        assert "inmutable" in str(exc.value), (
+            f"cambiar {columna} deberia decir que es inmutable, y dice: {exc.value}"
+        )
+
+    # 4. DELETE rechazado, y el periodo conciliado inmutable entero.
+    with pytest.raises(DBAPIError) as exc:
+        async with pg_engine.begin() as conn:
+            await conn.execute(
+                text("DELETE FROM movimiento_bancario WHERE id = :id"), {"id": movimiento}
+            )
+    assert "no se borra" in str(exc.value)
+
+    conciliacion = uuid.uuid4()
+    periodo = uuid.uuid4()
+    async with pg_engine.begin() as conn:
+        await conn.execute(
+            text(
+                "INSERT INTO conciliacion (id, empresa_id, cuenta_id, ejercicio, fecha_inicio, "
+                "fecha_fin, extracto_id, saldo_banco, saldo_libros, diferencia) "
+                "VALUES (:id, :empresa, :cuenta, 2026, '2026-01-02', '2026-02-27', :extracto, "
+                "100.0000, 100.0000, 0.0000)"
+            ),
+            {"id": conciliacion, "empresa": empresa, "cuenta": cuenta, "extracto": extracto},
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO periodo_conciliado (id, empresa_id, conciliacion_id, cuenta_id, "
+                "ejercicio, numero_periodo, fecha_inicio, fecha_fin, saldo_banco, saldo_libros, "
+                "diferencia) VALUES (:id, :empresa, :conc, :cuenta, 2026, 1, '2026-01-02', "
+                "'2026-02-27', 100.0000, 100.0000, 0.0000)"
+            ),
+            {"id": periodo, "empresa": empresa, "conc": conciliacion, "cuenta": cuenta},
+        )
+    with pytest.raises(DBAPIError) as exc:
+        async with pg_engine.begin() as conn:
+            await conn.execute(
+                text("UPDATE periodo_conciliado SET diferencia = 5.0000 WHERE id = :id"),
+                {"id": periodo},
+            )
+    assert "inmutable" in str(exc.value)
+    with pytest.raises(DBAPIError) as exc:
+        async with pg_engine.begin() as conn:
+            await conn.execute(
+                text("DELETE FROM periodo_conciliado WHERE id = :id"), {"id": periodo}
+            )
+    assert "inmutable" in str(exc.value)
+
+    # 5. `importe > 0` y unicidad de `sha256` por empresa: la deduplicacion de la
+    #    importacion hecha a nivel de esquema, no solo en el servicio.
+    with pytest.raises(DBAPIError):
+        async with pg_engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO movimiento_bancario (id, empresa_id, extracto_id, orden, "
+                    "fecha_operacion, concepto, importe, signo) "
+                    "VALUES (:id, :empresa, :extracto, 9, '2026-01-03', 'C', -5.0000, 'D')"
+                ),
+                {"id": uuid.uuid4(), "empresa": empresa, "extracto": extracto},
+            )
+    with pytest.raises(DBAPIError):
+        async with pg_engine.begin() as conn:
+            await conn.execute(
+                text(
+                    "INSERT INTO extracto_bancario (id, empresa_id, cuenta_id, fecha_inicio, "
+                    "fecha_fin, saldo_inicial, saldo_final, nombre_fichero, sha256, "
+                    "n_movimientos) VALUES (:id, :empresa, :cuenta, '2026-01-02', '2026-02-27', "
+                    "1863.7400, 5281.9900, 'otro.xlsx', :sha, 1)"
+                ),
+                {"id": uuid.uuid4(), "empresa": empresa, "cuenta": cuenta, "sha": sha},
+            )

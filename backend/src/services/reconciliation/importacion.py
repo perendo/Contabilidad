@@ -56,7 +56,12 @@ async def importar_extracto(
 
     codigo = (cuenta_codigo or dto.cuenta or "").strip()
     if not codigo:
-        raise ImportacionError("cuenta_requerida", "La cuenta es obligatoria")
+        raise ImportacionError(
+            "cuenta_requerida",
+            "La cuenta es obligatoria: el extracto no la trae y hay que indicar a que "
+            "cuenta 572 corresponde"
+            + (f" (IBAN del extracto: {dto.iban})" if dto.iban else ""),
+        )
     cuenta = await _cuenta_572(db, empresa_id, codigo)
 
     sha256 = hashlib.sha256(file_bytes).hexdigest()
@@ -128,9 +133,14 @@ async def importar_extracto(
         entity_id=str(extracto.id),
         payload={
             "cuenta": codigo,
+            "layout": layout,
             "n_movimientos": str(len(dto.movimientos)),
+            "saldo_inicial": str(dto.saldo_inicial),
             "saldo_final": str(dto.saldo_final),
-        },
+            # El IBAN no se persiste (no hay columna): queda en la traza, que es
+            # donde se consulta de que cuenta salio el fichero. Ver
+            # correcciones.md, pendiente de decidir si pasa a columna.
+            "iban": dto.iban or "",        },
     )
     await db.flush()
     return extracto

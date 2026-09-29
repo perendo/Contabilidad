@@ -272,3 +272,53 @@ reproducible.
 - [X] T060 HIGH Implementar devoluciones R19/C19, normalización de códigos, REVERSAL inmutable con gastos, reapertura de vencimientos y reclamaciones idempotentes según FR-006, SC-004 y US3 (completada — T039–T050)
 - [X] T061 HIGH Crear las páginas y cliente frontend de remesas, devoluciones y condiciones de terceros, incluyendo contexto de empresa activa, estados de error y descarga de ficheros según el plan y los contratos API (completada — T024–T026, T036, T046–T047)
 - [X] T062 CRITICAL Ejecutar y completar las pruebas unitarias, de integración y contractuales de balance estricto, aislamiento multi-tenant, correlatividad, formatos SEPA/CSB, conciliación sin duplicados, devoluciones y ejercicios cerrados; ejecutar typecheck y lint antes de cerrar la feature según Constitución V y SC-001..SC-007 (pendiente de verificación final)
+
+
+---
+
+# Deuda conocida (2026-09-29): esta spec no tiene migración SQL
+
+Anotada durante la corrección de SPEC-013, que descubrió que **esta spec tampoco la
+tenía**. No es una tarea hecha: es un estado que hace que la funcionalidad **no exista
+en la aplicación real**. Detalle del hallazgo en [AGENTS.md](../../../AGENTS.md) §52.3 y
+[`correcciones.md`](../../../correcciones.md) §3.
+
+## Qué pasa
+
+Las tablas de esta spec existen en los tests porque `Base.metadata.create_all` las
+crea en el SQLite en memoria. **En PostgreSQL no existen**: no hay fichero en
+`backend/migrations/` que las cree, así que cualquier endpoint que las use responde
+**500** con `UndefinedTableError` contra la base de datos real.
+
+Todas las puertas de la spec pasaron en verde cuando se cerró. Ninguna lo detectó
+porque `test_migrations.py` comprueba que las migraciones **declaradas** estén en el
+inventario, no que cada tabla del ORM tenga una: un modelo sin migración no está en el
+inventario, así que no hay nada que faltar.
+
+## Tablas afectadas
+
+- `remesa`
+- `recibo_remesa`
+- `secuencia_remesa`
+- `mandato_sepa`
+- `condicion_pronto_pago`
+- `devolucion_recibo`
+- `reclamacion`
+- `blob_fichero`
+- `cobro_conciliado`
+
+## Qué se ha hecho, y qué no
+
+**Sí**: un guard nuevo en `tests/unit/test_migrations.py`,
+`test_toda_tabla_del_orm_tiene_migracion`, que cruza los `__tablename__` de
+`src/models/` con los `CREATE TABLE` de `migrations/`. Con él, **una tabla nueva sin
+migración se ve al escribir el modelo**, y no meses después. Las 27 están inventariadas
+en `TABLAS_SIN_MIGRACION`, con dos guards que impiden que la lista mienta en ninguna de
+las dos direcciones.
+
+**No**: la migración de estas 9 tablas. Es trabajo de un día por spec —DDL, enums,
+índices, unicidades, FKs compuestas por `empresa_id`, triggers de inmutabilidad que
+correspondan, el contrato en `test_pg_schema.py` y los tasks que lo nombren— y no cabe
+en una corrección puntual. Lo que **no** hay que hacer es volver a dar la spec por
+cerrada sin mirar este apartado: la spec está implementada y probada, y aun así su
+funcionalidad no se puede usar.

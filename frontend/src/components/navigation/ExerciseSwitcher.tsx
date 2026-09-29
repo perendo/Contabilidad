@@ -35,15 +35,23 @@ const CLASES: Record<string, string> = {
   cerrado: "text-slate-400 line-through",
 };
 
-/** Texto que acompaña al color. Es lo que hace el estado legible sin color. */
-function etiqueta(estado: string, esActual: boolean): string | null {
+/**
+ * Texto que acompaña al color. Es lo que hace el estado legible sin color.
+ *
+ * Se exporta porque `SessionMenu` pinta la lista de ejercicios del menu de sesion y
+ * tiene que pintar el estado **igual** que aqui: la regla de FR-031 ("el estado no
+ * depende solo del color") son dos funciones, y dos copias se separan en cuanto una
+ * de las dos se toca.
+ */
+export function etiqueta(estado: string, esActual: boolean): string | null {
   if (estado === "cerrado") return "cerrado";
   if (estado === "con_apertura") return "apertura";
   if (!esActual) return "cerrando";
   return null;
 }
 
-function clase(ejercicio: EjercicioResuelto): string {
+/** Clase de estado de un ejercicio. Se exporta por el mismo motivo que `etiqueta`. */
+export function clase(ejercicio: EjercicioResuelto): string {
   const base = CLASES[ejercicio.estado] ?? CLASES.abierto_actual;
   return `${base} ${ejercicio.es_actual ? "font-semibold" : ""}`;
 }

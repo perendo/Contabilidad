@@ -64,7 +64,7 @@ El contador conoce en todo momento: saldo según banco, saldo según libros y di
 
 ## Requisitos (TODOs numerados)
 
-1. **T-01** Importación de extractos bancarios de la cuenta 572 (formato interoperable tipo 43/19).
+1. **T-01** Importación de extractos bancarios de la cuenta 572 (formato interoperable: 43/19, CSV normalizado o XLSX de banco).
 2. **T-02** Detección de duplicados de extracto.
 3. **T-03** Propuesta automática y cruce manual de apuntes con movimientos.
 4. **T-04** Informe de conciliación: saldo banco, saldo libros, pendientes y diferencia.
@@ -75,7 +75,7 @@ El contador conoce en todo momento: saldo según banco, saldo según libros y di
 
 ### Functional Requirements
 
-- **FR-001**: El sistema MUST importar extractos bancarios de las cuentas 572 de la empresa activa en formato interoperable (norma 43/19), con detección de duplicados.
+- **FR-001**: El sistema MUST importar extractos bancarios de las cuentas 572 de la empresa activa en formato interoperable, con detección de duplicados. Se admiten **tres** formatos: **norma 43/19** (ancho fijo), **CSV normalizado** y **XLSX de banco** (el que descarga el área de clientes de la banca electrónica). Un formato no soportado MUST rechazarse diciendo cuáles sí valen, sin intentar leerlo con el parser de otro formato.
 - **FR-002**: El sistema MUST aislar los extractos y la conciliación por empresa.
 - **FR-003**: El sistema MUST proponer cruces automáticos (importe y orientación deudora/acreedora) y permitir el cruce manual de apuntes con movimientos.
 - **FR-004**: El sistema MUST mantener para cada cuenta el saldo según extracto, saldo según libros, y la lista de elementos pendientes con su diferencia.
@@ -102,7 +102,8 @@ El contador conoce en todo momento: saldo según banco, saldo según libros y di
 
 ## Assumptions
 
-- El formato de extracto es interoperable (CSV/XLSX según norma 43/19) sin conexión directa a la banca electrónica.
+- El formato de extracto es interoperable sin conexión directa a la banca electrónica. **Actualizado 2026-09-29**: se admiten norma 43/19, CSV normalizado y XLSX de banco. El XLSX era el unico formato que la banca entrega en la practica, y la decisión original de este research lo había desestimado; ver `research.md` D1 y D1-bis.
+- El extracto en XLSX **no trae código de cuenta**: trae el IBAN. La cuenta 572 a la que corresponde la indica el usuario, porque un IBAN no es un código del plan de cuentas y no existe (ni debe existir) un maestro IBAN → cuenta: eso sería un maestro de bancos que no está en ninguna spec.
 - La conciliación cubre cuentas 572 en moneda de la empresa; las cuentas 570 (caja) se concilian con arqueos (SPEC-019).
 - Una operación bancaria sin apunte contable genera una alerta, no un asiento automático.
 

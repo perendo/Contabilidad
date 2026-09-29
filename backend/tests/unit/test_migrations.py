@@ -2,11 +2,20 @@
 
 El DDL PostgreSQL no se puede ejecutar sin una instancia PG; estos tests
 protegen el inventario y el orden de dependencias que aplica `db.migrate`.
+
+Y la parte de abajo vigila algo que el inventario **no** vigila por si solo: que
+toda tabla del ORM tenga una migracion que la cree. Ver
+`test_toda_tabla_del_orm_tiene_migracion`.
 """
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from db.migrate import MIGRATIONS_DIR, ORDEN_PREFERENTE, archivos_ordenados
+
+MODELOS_DIR = Path(__file__).resolve().parents[2] / "src" / "models"
 
 ESPERADAS = [
     "000_audit_log.sql",
@@ -33,6 +42,7 @@ ESPERADAS = [
     "021_adjuntos_asiento.sql",
     "022_favoritos.sql",
     "023_seed_demo.sql",
+    "024_conciliacion.sql",
 ]
 
 
@@ -183,3 +193,168 @@ def test_migracion_documentos_declara_inmutabilidad_y_huella() -> None:
     # ni un NOT NULL que obligue a tenerlos.
     assert "ALTER TABLE journal_entry" not in contenido
     assert "ADD COLUMN" not in contenido
+
+
+# ---------------------------------------------------------------------------
+# Lo que el inventario NO vigila por si solo
+# ---------------------------------------------------------------------------
+
+#: Tablas del ORM que **no** tienen migracion. No es una lista de permitidos por
+#: capricho: es la deuda real, medida, y la unica forma de que no crezca sin que
+#: nadie se entere. Solo puede ENCOGERSE.
+#:
+#: Por que existe esta lista: SPEC-013 se cerro con 54/54 tareas y todas sus puertas
+#: en verde, y aun asi sus seis tablas vivian solo en el `create_all` de los tests
+#: de SQLite. Contra PostgreSQL real no existian, `POST /api/v1/extractos` devolvia
+#: 500 y **toda** la superficie de conciliacion era inservible. El inventario de
+#: migraciones no lo ve porque comprueba que las migraciones *declaradas* esten
+#: listadas, no que cada tabla del ORM tenga una. Un modelo sin migracion es
+#: invisible para esa puerta.
+#:
+#: Corregido para conciliacion en 024. Las 27 que quedan son de SPEC-005/007/008/
+#: 010/011/012/014/020 y son trabajo aparte.
+TABLAS_SIN_MIGRACION: set[str] = {
+    # SPEC-004 / SPEC-012 (informes y libros de IVA)
+    "configuracion_informe",
+    "configuracion_sii",
+    "exportacion_modelo",
+    "formulacion_cuentas_anuales",
+    "iva_diferido_caja",
+    "periodo_fiscal",
+    "clasificacion_efe",
+    # SPEC-007 (facturación)
+    "factura",
+    "factura_linea",
+    "serie_factura",
+    # SPEC-008 / SPEC-011 (terceros y vencimientos)
+    "tercero",
+    "tercero_subcuenta",
+    "vencimiento",
+    "cobro_pago",
+    # SPEC-014 (inmovilizado)
+    "activo_inmovilizado",
+    "amortizacion_generada",
+    "baja_activo",
+    "plan_amortizacion",
+    # SPEC-020 (remesas SEPA)
+    "blob_fichero",
+    "cobro_conciliado",
+    "condicion_pronto_pago",
+    "devolucion_recibo",
+    "mandato_sepa",
+    "recibo_remesa",
+    "reclamacion",
+    "remesa",
+    "secuencia_remesa",
+}
+
+
+def _tablas_del_orm() -> set[str]:
+    nombres: set[str] = set()
+    for p in MODELOS_DIR.rglob("*.py"):
+        nombres.update(
+            re.findall(r'__tablename__\s*=\s*"([a-z_0-9]+)"', p.read_text(encoding="utf-8"))
+        )
+    return nombres
+
+
+def _tablas_creadas_por_migracion() -> set[str]:
+    sql = "\n".join(
+        p.read_text(encoding="utf-8", errors="replace") for p in MIGRATIONS_DIR.glob("*.sql")
+    )
+    return {
+        nombre
+        for nombre in _tablas_del_orm()
+        if re.search(rf"CREATE TABLE IF NOT EXISTS\s+{nombre}\b", sql, re.IGNORECASE)
+    }
+
+
+def test_toda_tabla_del_orm_tiene_migracion() -> None:
+    """Ninguna tabla nueva puede quedarse solo en el `create_all` de los tests.
+
+    Es la puerta que faltaba para lo de SPEC-013. Un modelo se escribe, se prueba
+    en SQLite y da verde; si nadie escribe la migracion, en PostgreSQL la
+    funcionalidad **no existe**, y nada en la suite lo dice porque la puerta de
+    migraciones no cruza modelo con esquema.
+    """
+    sin_migracion = _tablas_del_orm() - _tablas_creadas_por_migracion()
+    nuevos = sin_migracion - TABLAS_SIN_MIGRACION
+    assert not nuevos, (
+        f"tablas del ORM sin migracion: {sorted(nuevos)}. Escribela en "
+        "`backend/migrations/` y anadela a ORDEN_PREFERENTE y a ESPERADAS, o si "
+        "no va a tenerla, declara aqui por que (la lista TABLAS_SIN_MIGRACION "
+        "solo puede encogerse)"
+    )
+
+
+def test_la_lista_de_tablas_sin_migracion_no_miente() -> None:
+    """Si una tabla de la lista ya tiene migracion, la lista esta mintiendo y deja
+    de ser una lista: hay que borrarla para que el guard sea mas estricto."""
+    ya_migradas = TABLAS_SIN_MIGRACION & _tablas_creadas_por_migracion()
+    assert not ya_migradas, (
+        f"ya tienen migracion, borralas de TABLAS_SIN_MIGRACION: {sorted(ya_migradas)}"
+    )
+
+
+def test_la_lista_de_tablas_sin_migracion_no_nombra_tablas_inventadas() -> None:
+    """Lo mismo por el otro lado: si la lista nombra una tabla que ya no existe en
+    los modelos, se ha borrado el modelo y la lista no se ha enterado."""
+    inventadas = TABLAS_SIN_MIGRACION - _tablas_del_orm()
+    assert not inventadas, (
+        f"TABLAS_SIN_MIGRACION nombra tablas que ya no estan en los modelos: "
+        f"{sorted(inventadas)}; borralas de la lista"
+    )
+
+
+def test_la_migracion_de_conciliacion_crea_las_seis_tablas() -> None:
+    """Las seis de SPEC-013, una a una: es la lista concreta que se corrigió."""
+    contenido = (MIGRATIONS_DIR / "024_conciliacion.sql").read_text(encoding="utf-8")
+    for tabla in (
+        "extracto_bancario",
+        "movimiento_bancario",
+        "conciliacion",
+        "cruce_conciliacion",
+        "periodo_conciliado",
+        "alerta_conciliacion",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS {tabla} " in contenido, tabla
+
+
+def test_la_migracion_de_conciliacion_admite_cruzar_un_movimiento() -> None:
+    """El trigger de `movimiento_bancario` compara columna a columna en vez de
+    reventar cualquier UPDATE, y por eso permite cambiar `estado`.
+
+    Es el detalle que mas caro sale si se hace mal: confirmar un cruce pasa el
+    movimiento a `conciliado` y deshacerlo lo devuelve a `pendiente`
+    (`services/reconciliation/cruce.py`). Un trigger que reventase el UPDATE entero
+    haria la conciliacion inservible, que es justo su funcion, y en SQLite no se
+    veria porque alli la inmutabilidad no esta implementada.
+    """
+    contenido = (MIGRATIONS_DIR / "024_conciliacion.sql").read_text(encoding="utf-8")
+    bloque = contenido[contenido.index("f_movimiento_bancario_inmutable") :]
+    bloque = bloque[: bloque.index("$$ LANGUAGE plpgsql")]
+    # El chequeo es de columnas concretas, no un reventon generico.
+    for columna in ("importe", "signo", "fecha_operacion", "concepto", "orden", "extracto_id"):
+        assert f"NEW.{columna} IS DISTINCT FROM OLD.{columna}" in bloque, columna
+    # Y `estado` NO esta en la lista: es la que tiene que poder cambiar.
+    assert "NEW.estado IS DISTINCT FROM OLD.estado" not in bloque
+    assert "trg_movimiento_bancario_contenido_inmutable_update" in contenido
+    assert "trg_movimiento_bancario_inmutable_delete" in contenido
+
+
+def test_las_migraciones_son_idempotentes_tras_aplicadas() -> None:
+    """`db.migrate` reaplica los ficheros ya aplicados y el fixture `pg_engine` de
+    los tests de PostgreSQL tampoco borra el esquema antes de aplicarlos: los dos
+    escriben sobre la base de verdad. Un `ADD CONSTRAINT` sin guardia hace que el
+    segundo pase reviente con `DuplicateObjectError` y se cae la migracion entera
+    (leccion de AGENTS.md 50: editar una migracion ya aplicada obliga a que siga
+    siendo idempotente, o `db.migrate` falla sin decir en que estado quedo la base).
+    """
+    contenido = (MIGRATIONS_DIR / "024_conciliacion.sql").read_text(encoding="utf-8")
+    adds = re.findall(r"ADD CONSTRAINT (\w+)", contenido)
+    for nombre in adds:
+        assert f"conname = '{nombre}'" in contenido, (
+            f"ADD CONSTRAINT {nombre} sin guardia: el segundo pase de db.migrate "
+            "falla con DuplicateObjectError"
+        )
+

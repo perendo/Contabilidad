@@ -6,6 +6,8 @@
 
 **Tests**: Tests incluidos; la constitución V exige pytest obligatorio en cada tarea finalizada (partida doble + aislamiento multi-tenant).
 
+> **Nota sobre el recuento**: las 54 tareas originales se marcaron todas el 2026-09-19, y ese día la spec se dio por cerrada. El 2026-09-29 se añadieron **22 tareas más** (T055–T076) tras una corrección sobre la aplicación real que encontró dos cosas que la spec no cubría: el formato **XLSX** que entrega la banca, y la **migración SQL** que le faltaba a la spec entera. Ver «Estado real (2026-09-29)» al final del fichero, que explica por qué las puertas de la spec se pueden haber dado en verde con la conciliación sin funcionar.
+
 **Organization**: Organizado por user story para implementación y test independientes.
 
 **Stack**: Python 3.11+ / FastAPI async / SQLAlchemy 2.x async + asyncpg / PostgreSQL 16+ / Next.js. Importes: `Decimal`/`NUMERIC(18,4)`, prohibido `float`. Endpoints bajo `/api/v1/...` con empresa activa en cabecera de sesión (SPEC-003/015), nunca en path ni body.
@@ -277,3 +279,86 @@ Desviaciones documentadas:
 - **Fixtures**: `extracto_43_19_{valido,duplicado,otra_empresa,malformado}.txt` y
   `extracto_csv_normalizado.csv`.
 - Puertas: 21 tests nuevos en verde; ruff + mypy limpios; `next build` con las 4 rutas nuevas.
+
+
+---
+
+# Corrección 2026-09-29: XLSX de banco y migración SQL
+
+Trabajo **fuera del ciclo de tareas** de la spec, a petición del usuario sobre la
+aplicación en funcionamiento. Detalle en [`correcciones.md`](../../../correcciones.md) y
+[AGENTS.md](../../../AGENTS.md) §52.
+
+Estas tareas están **hechas y verificadas**. Se numeran a partir de T055 para no
+renumerar las 54 anteriores, y porque renumerarlas rompería la trazabilidad de las
+puertas que las citan.
+
+## Phase 7: Migration SQL (bloqueante — sin esto, la spec no funcionaba)
+
+- [X] T055 [P] [US1] Escribir `backend/migrations/024_conciliacion.sql` con los 9 enums y las 6 tablas (`extracto_bancario`, `movimiento_bancario`, `conciliacion`, `cruce_conciliacion`, `periodo_conciliado`, `alerta_conciliacion`), 2 CHECK de cuadre, 5 FKs compuestas por `empresa_id` y la unicidad de `sha256` por empresa. **Era lo que faltaba para que la spec entera funcionara**: sin esta migración las 6 tablas solo existían por el `create_all` de los tests de SQLite y `POST /api/v1/extractos` devolvía 500 en PostgreSQL.
+- [X] T056 [P] [US1] Registrar `024_conciliacion.sql` en `src/db/migrate.py::ORDEN_PREFERENTE` y en `tests/unit/test_migrations.py::ESPERADAS`, y añadir las 6 tablas a `TABLAS_ESPERADAS` de `tests/integration/test_pg_schema.py`.
+- [X] T057 [US1] Hacer `024_conciliacion.sql` **idempotente**, con la guarda de `pg_constraint` en cada `ADD CONSTRAINT`. `db.migrate` reaplica los ficheros ya aplicados y el fixture `pg_engine` aplica sobre la base de verdad sin borrar el esquema: los dos escriben encima, y un `ADD CONSTRAINT` sin guardia tumba la migración entera en el segundo pase.
+- [X] T058 [US1] Triggers de inmutabilidad de `movimiento_bancario` y `periodo_conciliado` en la migración. **El de `movimiento_bancario` compara columna a columna y deja pasar `estado`**: confirmar un cruce lo pasa a `conciliado` y deshacerlo lo devuelve a `pendiente` (`services/reconciliation/cruce.py:129` y `:173`), así que un trigger append-only habría hecho la conciliación inservible, que es su función entera.
+- [X] T059 [US1] Aplicar sobre PostgreSQL 18.6 real y comprobar idempotencia: `db.migrate` 24/24 y la segunda pasada sin efecto.
+
+## Phase 8: Formato XLSX de banco (US1)
+
+- [X] T060 [P] [US1] Declarar el catálogo de formatos `LAYOUTS` en `services/reconciliation/layouts.py`, que **no existía** (solo estaban los que el parser discriminaba), con las columnas obligatorias y opcionales del XLSX.
+- [X] T061 [P] [US1] `parse_xlsx_bancario()` en `services/reconciliation/parsers.py` y sus ayudantes: `normalizar_columna` (compara cabeceras sin tildes), `importe_de_celda` (`Decimal(str(float))` cuantizado a 4, nunca aritmética en `float`), `_fecha_xlsx` (cuatro formatos), `_buscar_cabecera` (la busca en las 40 primeras filas, no asume la 1), `_saldo_final_desde_cadena`, `_divisa_eur`, `_referencia_xlsx` e `_iban_de_la_hoja`.
+- [X] T062 [US1] Derivar el `saldo_inicial` de la columna `Saldo` encadenando `saldo[i] − importe[i] == saldo[i+1]`, y **rechazar** el extracto descuadrado. Es el equivalente del registro de control `98` de la norma 43, sin registro de control.
+- [X] T063 [US1] Hacer `parse_extracto` estricto: un `layout` desconocido se rechaza (`layout_desconocido`) en vez de caer en la norma 43 por defecto.
+- [X] T064 [P] [US1] `_validar_layout()` en `api/reconciliation.py`: 422 con la **lista** de los formatos válidos, antes de leer el fichero.
+- [X] T065 [P] [US1] `ExtractoDTO.iban`; el error `cuenta_requerida` dice cuál es el IBAN del extracto; el `payload` de auditoría lleva `layout`, `iban` y `saldo_inicial`.
+- [X] T066 [US1] Frontend: tercera opción en el desplegable de `/conciliacion/importar`, `accept` con `.xlsx,.xlsm`, el formato **sigue al fichero** elegido, texto de ayuda por formato y aviso de que la cuenta hay que ponerla a mano.
+
+## Phase 9: Tests de la corrección
+
+- [X] T067 [P] [US1] `tests/unit/test_parser_xlsx.py` (31): forma del formato, cadena de saldos, orden ascendente y descendente, sin metadatos, fecha de Excel, cabecera sin tildes, IBAN, pie de totales, y los 7 rechazos. Constructor en `tests/unit/extracto_xlsx_support.py` con un XLSX **sintético**.
+- [X] T068 [P] [US1] `tests/integration/test_importacion_xlsx.py` (14): persistencia, signo e importe positivo, IBAN en la auditoría, cuenta obligatoria, cuenta inexistente, duplicado, descuadre sin dejar nada a medias, USD, aislamiento entre empresas y 4 tests HTTP.
+- [X] T069 [P] [US1] `tests/unit/test_extracto_layouts.py` (12): el desplegable y el catálogo dicen lo mismo, `accept` incluye `.xlsx`, y la API acepta lo del catálogo y rechaza lo demás **diciendo lo que sí hay**.
+- [X] T070 [US1] Contrato PostgreSQL en `tests/integration/test_pg_schema.py`: las 6 tablas existen, `UPDATE ... SET estado` se admite, el `UPDATE` de contenido y el `DELETE` se rechazan, `periodo_conciliado` es append-only, `importe > 0` y unicidad de `sha256`.
+- [X] T071 [US1] Guard que faltaba, en `tests/unit/test_migrations.py`: `test_toda_tabla_del_orm_tiene_migracion` cruza los `__tablename__` de `src/models/` con los `CREATE TABLE` de `migrations/`, más dos guards que impiden que `TABLAS_SIN_MIGRACION` mienta en ninguna de las dos direcciones.
+- [X] T072 [US1] Verificar los cinco guards **reintroduciendo su defecto** uno a uno, y documentar el resultado. Un guard que no se ha visto fallar no es un guard.
+- [X] T073 [US1] Prueba de humo contra la aplicación real (HTTP + PostgreSQL 18.6) que sube el fichero de `Data/`, comprueba 201/409/422 y **deja la base como estaba**.
+
+## Phase 10: Discrepancias de contrato detectadas (documentadas, no resueltas)
+
+- [X] T074 [US1] Anotar que `concepto_norma` aparece en `contracts/api-contracts.md` y **nunca se implementó**. Queda declarado como discrepancia.
+- [X] T075 [US1] Anotar que la respuesta 422 no incluye `registro` ni `campo` aunque el contrato los declara, y que sehfajaron en el mensaje.
+
+## Deuda que esta corrección ha destapado y NO ha pagado
+
+- [X] T076 [US1] Inventariar las **27 tablas del ORM sin migración** que quedan, de SPEC-005/007/008/010/011/012/014/020, en `TABLAS_SIN_MIGRACION`. Facturación, terceros, remesas SEPA, inmovilizado y libros de IVA son features enteras: es trabajo de un día por spec. Lo que sí se ha hecho es dejar la lista escrita y protegida por dos guards, para que la deuda sea visible y no crezca en silencio. **Consecuencia para el usuario: importar facturas, remesas, vencimientos o inmovilizado devuelve 500 en la aplicación real, por el mismo motivo que tenía esta spec.**
+
+## Estado real (2026-09-29, +22 tareas, 76/76)
+
+Detalle largo en [`correcciones.md`](../../../correcciones.md).
+
+**Lo que se corrigió**, en dos bloques:
+1. **XLSX de banco** (`xlsx_bancario`): el formato que entrega la banca electrónica, con
+   la derivación del `saldo_inicial` desde la columna de saldos y el rechazo del extracto
+   descuadrado.
+2. **Migración `024_conciliacion.sql`**: las 6 tablas de esta spec.
+
+**Por qué hizo falta lo segundo para que lo primero sirviera.** Esta spec se cerró el
+2026-09-19 con 54/54 tareas y todas sus puertas en verde, y aun así **su conciliación
+era inservible en la aplicación real**: las 6 tablas no existían en PostgreSQL porque
+solo las creaba el `create_all` de los tests de SQLite. `POST /api/v1/extractos`
+devolvía 500 con `UndefinedTableError`. Sin la migración, todo lo demás de esta
+sección habría pasado sus puertas y seguido sin funcionar.
+
+**Por qué ninguna puerta lo vio.** `test_migrations.py` comprueba que las migraciones
+**declaradas** estén en el inventario, no que cada tabla del ORM tenga una. Un modelo
+sin migración no está en el inventario, así que no hay nada que faltar. Lo agravó que
+en las 20 specs posteriores **cada una** añadiera su migración sin que nadie notara
+que faltaba la de una anterior. La puerta nueva (`T071`) cruza modelos con esquema, que
+es lo que habría parado la spec entera.
+
+**Lecciones que se llevan a `research.md`**: el formato real del XLSX y sus
+consecuencias de parser (`D1-bis`), y que un trigger de inmutabilidad tiene que leerse
+contra el código que lo va a disparar, no contra la constitución que dice cumplir.
+
+**Lo que queda abierto, y no se ha hecho**: el IBAN no se persiste como columna (solo
+queda en el `payload` de la auditoría); no existe maestro IBAN → cuenta, y no debería
+existir sin su propia spec; `POST /api/v1/extractos` no tiene límite de tamaño; y el
+fixture `extracto_43_19_duplicado.txt` sigue huérfano, sin ninguna prueba que lo use.

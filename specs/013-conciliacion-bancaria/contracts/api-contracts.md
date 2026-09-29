@@ -7,12 +7,41 @@ Estilo: REST bajo `/api/v1/...` (los endpoints exigen la cabecera de sesión aut
 ## Extractos
 
 ### POST `/api/v1/extractos`
-Importar un fichero de extracto (norma 43/19 o CSV normalizado) para una cuenta 572.
-- `multipart/form-data`: `file` (fichero), campos opcionales `layout` (`norma_43_1919` | `csv_normalizado`) y `concepto_norma` (normalización).
-- Reglas: valida la cuenta 572 del plan de la empresa activa; calcula `sha256`; detecta duplicados (huella y solapamiento por rango/saldos/nº movimientos); persiste extracto + movimientos + auditoría en una transacción ACID.
+Importar un fichero de extracto para una cuenta 572. **Actualizado 2026-09-29**: se
+admiten tres formatos, no dos, y `layout` pasa a estar validado.
+
+- `multipart/form-data`: `file` (fichero) y campos opcionales `layout` y `cuenta`.
+  - `layout`: `"norma_43_1919"` (por defecto) | `"csv_normalizado"` | `"xlsx_bancario"`.
+    La lista vive en `services/reconciliation/layouts.py::LAYOUTS`, que es la única
+    fuente; el desplegable del frontend la replica y un guard
+    (`tests/unit/test_extracto_layouts.py`) comprueba que las dos digan lo mismo.
+    **Un valor fuera del catálogo se rechaza con 422 y la lista de los válidos**, en
+    lugar de intentarse leer con el parser de otro formato.
+  - `cuenta`: código de la cuenta 572 a la que corresponde el extracto. **Obligatorio
+    para `xlsx_bancario`**: el XLSX del banco trae el IBAN, que no es un código del
+    plan, y no existe un maestro IBAN → cuenta.
+  - `concepto_norma`: sigue **sin implementarse**. El contrato lo declaraba y la
+    implementación nunca lo tuvo; es una discrepancia pendiente de cerrar (ver
+    `tasks.md`, «Estado real»).
+- Reglas: valida la cuenta 572 del plan de la empresa activa; calcula `sha256`; detecta
+  duplicados (huella y solapamiento por rango/saldos/nº movimientos); persiste extracto
+  + movimientos + auditoría en una transacción ACID.
+- Particularidades de `xlsx_bancario`: la cabecera se busca en las 40 primeras filas;
+  las fechas admiten texto `DD/MM/AAAA`, ISO, `datetime` y `date`; el signo va dentro
+  del importe y se devuelve en su propia columna; **el `saldo_inicial` se deriva de la
+  columna `Saldo`**, encadenando `saldo[i] - importe[i] == saldo[i+1]`, y el extracto se
+  **rechaza** si la cadena no cuadra (es el equivalente del registro de control `98`).
+  Ver `research.md` D1-bis.
 - 201: `{ "id", "cuenta_id", "fecha_inicio", "fecha_fin", "saldo_inicial", "saldo_final", "n_movimientos", "estado": "importado" }`
 - 409: extracto duplicado `{ "error": "extracto_duplicado", "extracto_existente_id" }`
-- 422: fichero malformado `{ "error": "layout_invalido", "registro": n, "campo": "..." }`
+- 422, con `error` según el caso:
+  - `"layout_desconocido"` — con `"soportados"`: el mapa de formatos válidos.
+  - `"layout_invalido"` — fichero malformado. La respuesta **no** incluye `registro` ni
+    `campo`: el mensaje los lleva en texto (`Línea 12: la columna Saldo no encaja…`).
+  - `"cuenta_requerida"` — no se indicó `cuenta` y el formato no la trae. El mensaje
+    incluye el IBAN del extracto cuando se ha podido leer.
+  - `"divisa_no_soportada"` — el extracto no está en euros. El extracto no lleva tipo
+    de cambio, así que importarlo tal cual daría cifras falsas: es peor no importarlo.
 - 404: cuenta 572 inexistente en la empresa activa.
 
 ### GET `/api/v1/extractos`

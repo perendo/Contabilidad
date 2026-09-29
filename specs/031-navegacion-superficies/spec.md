@@ -226,8 +226,10 @@ reubicadas y comprobar que llevan a la ubicación vigente.
   favorito marcado, MUST mostrar solo los 5 primeros por orden y MUST avisar de que
   hay más. El favorito que no se muestra MUST NOT perderse: si el usuario desmarca
   otro, MUST reaparecer.
-- El usuario cierra sesión: al volver a entrar recupera empresa, ejercicio y
-  favoritos.
+- El usuario cierra sesión desde el menú de sesión: al volver a entrar recupera
+  empresa, ejercicio y favoritos. (Actualizado 2026-09-29: hasta esa fecha el
+  escenario era imposible de reproducir, porque cerrar sesión no existía en
+  ninguna parte de la aplicación.)
 - La consulta de contexto no puede resolverse: la aplicación MUST comunicar que no
   puede determinar el contexto y MUST impedir cualquier registro, en lugar de
   asumir una empresa o un ejercicio.
@@ -235,7 +237,13 @@ reubicadas y comprobar que llevan a la ubicación vigente.
   MUST conservar lo introducido y MUST ofrecer reidentificarse sin perderlo.
 - El usuario solo tiene acceso a una empresa: el selector de empresa MUST quedar
   visible pero sin opciones que cambiar, en lugar de ocultarse y desplazar el
-  resto de la zona de contexto.
+  resto de la zona de contexto. Lo mismo en el menú de sesión: MUST decirlo, en
+  lugar de abrir una lista de un solo elemento.
+- El usuario cierra sesión desde el menú: MUST borrarse el ejercicio seleccionado
+  **antes** que la empresa activa, porque el almacén de ejercicios está indexado
+  por empresa. Al revés, el ejercicio que eligió el usuario anterior se queda
+  guardado y el siguiente usuario de la misma máquina abre la aplicación en él
+  (añadido 2026-09-29).
 - El usuario no puede acceder a ninguna superficie por cambio de rol: la aplicación
   MUST retirar los destinos inaccesibles y MUST indicar que no hay superficies
   disponibles, sin dejar ningún destino roto.
@@ -254,6 +262,15 @@ reubicadas y comprobar que llevan a la ubicación vigente.
   zona de la interfaz situada antes del contenido de negocio.
 - **FR-003**: La aplicación MUST ofrecer la selección de empresa y la selección de
   ejercicio tanto en escritorio como en dispositivo pequeño.
+- **FR-032** (añadido 2026-09-29): La zona de contexto MUST ofrecer, tanto en
+  escritorio como en dispositivo pequeño, un **menú de sesión** que reúna las tres
+  acciones de identidad: cambiar de empresa, cambiar de ejercicio y **cerrar
+  sesión**. Cerrar sesión MUST vaciar las credenciales del cliente (el token de
+  `localStorage` y la cookie de sesión) y MUST dirigir a la identificación.
+  La redacción original de FR-002 hablaba de identidad, empresa y ejercicio como
+  **información** que se muestra, y no como **acciones**: por eso la aplicación
+  cerró sin ninguna forma de cerrar sesión, que es exactamente lo que un usuario
+  espera encontrar en el sitio donde está su nombre.
 - **FR-004**: Un cambio de empresa MUST recalcular el contexto sin arrastrar
   datos de la empresa anterior, y MUST reevaluar el ejercicio activo de la
   empresa nueva.

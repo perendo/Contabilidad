@@ -295,3 +295,47 @@ Con varios desarrolladores:
     no está en borrador (emitida o anulada); el estado se comprueba explícitamente.
 11. **FR-011 (criterio de caja)**: `regimen_caja=true` + `iva_devengado=false`; el IVA se
     contabiliza íntegro en 477/472 quedando diferido (la gestión del devengo pertenece a SPEC-012).
+
+
+---
+
+# Deuda conocida (2026-09-29): esta spec no tiene migración SQL
+
+Anotada durante la corrección de SPEC-013, que descubrió que **esta spec tampoco la
+tenía**. No es una tarea hecha: es un estado que hace que la funcionalidad **no exista
+en la aplicación real**. Detalle del hallazgo en [AGENTS.md](../../../AGENTS.md) §52.3 y
+[`correcciones.md`](../../../correcciones.md) §3.
+
+## Qué pasa
+
+Las tablas de esta spec existen en los tests porque `Base.metadata.create_all` las
+crea en el SQLite en memoria. **En PostgreSQL no existen**: no hay fichero en
+`backend/migrations/` que las cree, así que cualquier endpoint que las use responde
+**500** con `UndefinedTableError` contra la base de datos real.
+
+Todas las puertas de la spec pasaron en verde cuando se cerró. Ninguna lo detectó
+porque `test_migrations.py` comprueba que las migraciones **declaradas** estén en el
+inventario, no que cada tabla del ORM tenga una: un modelo sin migración no está en el
+inventario, así que no hay nada que faltar.
+
+## Tablas afectadas
+
+- `factura`
+- `factura_linea`
+- `serie_factura`
+
+## Qué se ha hecho, y qué no
+
+**Sí**: un guard nuevo en `tests/unit/test_migrations.py`,
+`test_toda_tabla_del_orm_tiene_migracion`, que cruza los `__tablename__` de
+`src/models/` con los `CREATE TABLE` de `migrations/`. Con él, **una tabla nueva sin
+migración se ve al escribir el modelo**, y no meses después. Las 27 están inventariadas
+en `TABLAS_SIN_MIGRACION`, con dos guards que impiden que la lista mienta en ninguna de
+las dos direcciones.
+
+**No**: la migración de estas 3 tablas. Es trabajo de un día por spec —DDL, enums,
+índices, unicidades, FKs compuestas por `empresa_id`, triggers de inmutabilidad que
+correspondan, el contrato en `test_pg_schema.py` y los tasks que lo nombren— y no cabe
+en una corrección puntual. Lo que **no** hay que hacer es volver a dar la spec por
+cerrada sin mirar este apartado: la spec está implementada y probada, y aun así su
+funcionalidad no se puede usar.
