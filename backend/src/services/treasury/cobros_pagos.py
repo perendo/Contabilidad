@@ -97,6 +97,7 @@ async def registrar_operacion(
     fecha: date,
     importe: str,
     cuenta_tesoreria: str | None = None,
+    cuenta_bancaria_id: uuid.UUID | None = None,
     actor: str | None = None,
 ) -> CobroPago:
     """Register a total or partial collection/payment and update the vencimiento."""
@@ -128,7 +129,18 @@ async def registrar_operacion(
             f"El importe {importe_d} supera el saldo pendiente {vencimiento.saldo_pendiente}",
         )
 
-    cuenta = cuenta_tesoreria or CUENTA_BANCO
+    cuenta = cuenta_tesoreria
+    if cuenta_bancaria_id is not None:
+        from models.treasury.cuenta_bancaria import CuentaBancaria
+        cb = await db.scalar(
+            select(CuentaBancaria).where(
+                CuentaBancaria.empresa_id == empresa_id,
+                CuentaBancaria.id == cuenta_bancaria_id,
+            )
+        )
+        if cb is not None and cb.cuenta_contable:
+            cuenta = cb.cuenta_contable
+    cuenta = cuenta or CUENTA_BANCO
     asiento, lineas = _asiento(
         empresa_id=empresa_id,
         ejercicio=fecha.year,
@@ -178,19 +190,23 @@ async def registrar_operacion(
 
 async def registrar_cobro(
     db: AsyncSession, *, empresa_id: int, vencimiento_id: uuid.UUID, fecha: date,
-    importe: str, cuenta_tesoreria: str | None = None, actor: str | None = None,
+    importe: str, cuenta_tesoreria: str | None = None,
+    cuenta_bancaria_id: uuid.UUID | None = None, actor: str | None = None,
 ) -> CobroPago:
     return await registrar_operacion(
         db, empresa_id=empresa_id, vencimiento_id=vencimiento_id, fecha=fecha,
-        importe=importe, cuenta_tesoreria=cuenta_tesoreria, actor=actor,
+        importe=importe, cuenta_tesoreria=cuenta_tesoreria,
+        cuenta_bancaria_id=cuenta_bancaria_id, actor=actor,
     )
 
 
 async def registrar_pago(
     db: AsyncSession, *, empresa_id: int, vencimiento_id: uuid.UUID, fecha: date,
-    importe: str, cuenta_tesoreria: str | None = None, actor: str | None = None,
+    importe: str, cuenta_tesoreria: str | None = None,
+    cuenta_bancaria_id: uuid.UUID | None = None, actor: str | None = None,
 ) -> CobroPago:
     return await registrar_operacion(
         db, empresa_id=empresa_id, vencimiento_id=vencimiento_id, fecha=fecha,
-        importe=importe, cuenta_tesoreria=cuenta_tesoreria, actor=actor,
+        importe=importe, cuenta_tesoreria=cuenta_tesoreria,
+        cuenta_bancaria_id=cuenta_bancaria_id, actor=actor,
     )

@@ -1,3 +1,4 @@
+from models.treasury.cuenta_bancaria import CuentaBancaria
 """Treasury domain models."""
 
 from models.treasury.alerta_conciliacion import (
@@ -94,6 +95,7 @@ __all__ = [
     "CruceOrigen",
     "CrucePrioridad",
     "DevolucionRecibo",
+    "CuentaBancaria",
     "Efecto",
     "EstadoAlerta",
     "EstadoAlertaLiquidez",

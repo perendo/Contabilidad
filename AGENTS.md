@@ -2789,3 +2789,38 @@ parser contra el. `Data/` esta ahora en `.gitignore`.
   - **Pistas inmutables y auditoría**: Referencias históricas (`journal_entry.original_id`, `audit_log.entidad_id`, `blob_id`, `usuario_id`) se conservan sin FK restrictiva para salvaguardar el principio de inmutabilidad (Constitución II), impidiendo bloqueos o eliminaciones en cascada.
   - **Referencias operativas**: Se mantiene la protección multi-tenant mediante aislamiento en aplicación (`Depends(get_empresa_id)` e índices compuestos), planificando el endurecimiento selectivo a FK compuestas `(empresa_id, id)` conforme los flujos de `flush` lo requieran.
 - **FK ciega al tenant**: `evento_auditoria_acceso.rol_id` documentada en `FK_CIEGAS_AL_TENANT` para corrección estructurada.
+
+## 54. Migración 032 · Maestro de Cuentas Bancarias y Selección en Asientos de Tesorería (2026-09-29)
+
+### 1. Migración SQL `032_cuentas_bancarias.sql`
+- **Tabla `cuentas_bancarias`**:
+  - `id` (UUID PK).
+  - `empresa_id` (BIGINT NOT NULL, multi-tenant estricto según Constitución III).
+  - `nombre` (VARCHAR(120), ej. "Santander Principal", "BBVA Operativa").
+  - `banco` (VARCHAR(120) opcional).
+  - `iban` (VARCHAR(34) NOT NULL).
+  - `bic` (VARCHAR(11) opcional).
+  - `cuenta_contable` (VARCHAR(20) NOT NULL DEFAULT '572', subcuenta del PGC vinculada, ej. '57200001').
+  - `activa` (BOOLEAN NOT NULL DEFAULT TRUE).
+  - `created_at`, `updated_at` (TIMESTAMPTZ).
+  - Restricciones:
+    - `uq_cuentas_bancarias_empresa_id UNIQUE (empresa_id, id)`
+    - `uq_cuentas_bancarias_empresa_iban UNIQUE (empresa_id, iban)`
+    - Índices: `ix_cuentas_bancarias_empresa_id`, `ix_cuentas_bancarias_activa`.
+- **Registro en el inventario canónico**: Incorporada a `ORDEN_PREFERENTE` en `db/migrate.py`, `ESPERADAS` en `tests/unit/test_migrations.py` y `TABLAS_ESPERADAS` en `tests/integration/test_pg_schema.py`. Total: **33 migraciones**.
+
+### 2. Servicio de Tesorería y Selección de Cuenta de Origen
+- **Nuevo servicio `services.treasury.cuentas_bancarias`**:
+  - `crear_cuenta_bancaria(empresa_id, nombre, iban, banco, bic, cuenta_contable, actor)` con validación de IBAN y unicidad en la empresa.
+  - `listar_cuentas_bancarias(empresa_id, solo_activas)` y `obtener_cuenta_bancaria(empresa_id, cuenta_bancaria_id)`.
+  - Auditoría integrada con `audit_escribir` (`action="CREAR_CUENTA_BANCARIA"`).
+- **Actualización de cobros y pagos (`services.treasury.cobros_pagos`)**:
+  - `registrar_operacion`, `registrar_cobro` y `registrar_pago` ahora aceptan `cuenta_bancaria_id: uuid.UUID | None = None`.
+  - Si se proporciona `cuenta_bancaria_id`, el servicio resuelve la entidad vinculada a la empresa activa y extrae su `cuenta_contable` (ej. `57200001`) para reflejar la cuenta bancaria de origen concreta en el asiento contable balanceado (Constitución I).
+- **Exposición API**:
+  - Endpoints en `api/treasury/cuentas_bancarias.py` montados bajo `/api/v1/cuentas-bancarias` (`GET /`, `GET /{id}`, `POST /`).
+  - Endpoints de cobro y pago (`/api/v1/vencimientos/{id}/cobrar`, `/api/v1/vencimientos/{id}/pagar`) admiten `cuenta_bancaria_id` en el cuerpo JSON de la petición.
+
+### 3. Pruebas y Verificación
+- Guard específico: `tests/unit/test_migrations.py::test_migracion_cuentas_bancarias_declara_estructura`.
+- Pruebas unitarias de flujo: `tests/unit/test_cuentas_bancarias_tesoreria.py` verificando creación de Banco A y Banco B, rechazo de IBAN duplicado, y generación de asiento contable imputando a la subcuenta contable del banco seleccionado.

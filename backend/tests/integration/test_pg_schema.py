@@ -115,6 +115,7 @@ TABLAS_ESPERADAS = {
     "balanza_periodo_linea",
     "secuencia_reapertura",
     "cierre_ejercicio",
+    "cuentas_bancarias",
     "solicitud_reapertura",
     "exportacion",
     "manifiesto_exportacion",

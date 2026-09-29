@@ -1,3 +1,4 @@
+from api.treasury.cuentas_bancarias import router as cuentas_bancarias_router
 """Versioned treasury API router."""
 
 from fastapi import APIRouter, Depends
@@ -31,3 +32,4 @@ router.include_router(efectos_router)
 router.include_router(cobros_medio_router)
 router.include_router(anticipos_router)
 router.include_router(cesiones_router)
+router.include_router(cuentas_bancarias_router)

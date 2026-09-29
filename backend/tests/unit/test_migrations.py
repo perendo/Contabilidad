@@ -1,4 +1,4 @@
-﻿"""Migration inventory (SPEC-001/002/003/004).
+"""Migration inventory (SPEC-001/002/003/004).
 
 El DDL PostgreSQL no se puede ejecutar sin una instancia PG; estos tests
 protegen el inventario y el orden de dependencias que aplica `db.migrate`.
@@ -53,6 +53,7 @@ ESPERADAS = [
     "029_remesas_complemento.sql",
     "030_inmovilizado_completo.sql",
     "031_informes_iva.sql",
+    "032_cuentas_bancarias.sql",
 ]
 
 
@@ -448,3 +449,11 @@ def test_las_migraciones_son_idempotentes_tras_aplicadas() -> None:
             "falla con DuplicateObjectError"
         )
 
+
+def test_migracion_cuentas_bancarias_declara_estructura():
+    """Migración 032: tabla cuentas_bancarias por empresa con unicidad de IBAN."""
+    contenido = (MIGRATIONS_DIR / "032_cuentas_bancarias.sql").read_text(encoding="utf-8")
+    assert "CREATE TABLE IF NOT EXISTS cuentas_bancarias" in contenido
+    assert "uq_cuentas_bancarias_empresa_id UNIQUE (empresa_id, id)" in contenido
+    assert "uq_cuentas_bancarias_empresa_iban UNIQUE (empresa_id, iban)" in contenido
+    assert "ix_cuentas_bancarias_empresa_id" in contenido

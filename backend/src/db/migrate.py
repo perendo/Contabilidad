@@ -76,6 +76,7 @@ ORDEN_PREFERENTE: tuple[str, ...] = (
     # Grupo 5 de las 27 (informes anuales y libros de IVA), y ultima de las 27.
     # No declara ninguna FK, asi que no depende de nadie; el numero es por historial.
     "031_informes_iva.sql",
+    "032_cuentas_bancarias.sql",
 )
 
 

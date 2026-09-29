@@ -33,6 +33,7 @@ class OperacionBody(BaseModel):
     fecha: date
     importe: str = Field(pattern=r"^\d+(\.\d{1,4})?$")
     cuenta_tesoreria: str | None = None
+    cuenta_bancaria_id: uuid.UUID | None = None
 
 
 def _raise(exc: CobroPagoError) -> NoReturn:
@@ -129,7 +130,9 @@ async def cobrar(
         op = await registrar_cobro(
             session, empresa_id=empresa_id, vencimiento_id=vencimiento_id,
             fecha=body.fecha, importe=body.importe,
-            cuenta_tesoreria=body.cuenta_tesoreria, actor=user.full_name,
+            cuenta_tesoreria=body.cuenta_tesoreria,
+            cuenta_bancaria_id=body.cuenta_bancaria_id,
+            actor=user.full_name,
         )
     except CobroPagoError as exc:
         _raise(exc)
@@ -148,7 +151,9 @@ async def pagar(
         op = await registrar_pago(
             session, empresa_id=empresa_id, vencimiento_id=vencimiento_id,
             fecha=body.fecha, importe=body.importe,
-            cuenta_tesoreria=body.cuenta_tesoreria, actor=user.full_name,
+            cuenta_tesoreria=body.cuenta_tesoreria,
+            cuenta_bancaria_id=body.cuenta_bancaria_id,
+            actor=user.full_name,
         )
     except CobroPagoError as exc:
         _raise(exc)

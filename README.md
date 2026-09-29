@@ -5,7 +5,7 @@
 El sistema opera y se valida **exclusivamente sobre PostgreSQL (16+)**. 
 Se ha descartado formalmente el uso de SQLite en runtime y entornos de producción:
 - Todas las restricciones de integridad, enumeraciones tipadas (`CREATE TYPE`), disparadores PL/pgSQL de inmutabilidad (Constitución II), aislamiento multi-tenant estricto (`empresa_id`, Constitución III) y secuencias correlativas sin saltos residen en el motor PostgreSQL.
-- Las 32 migraciones de `backend/migrations/` (`000_audit_log.sql` a `031_informes_iva.sql`) configuran las 109 tablas del modelo de datos sin discrepancias.
+- Las 33 migraciones de `backend/migrations/` (incluyendo `032_cuentas_bancarias.sql` para gestión multi-banco) (`000_audit_log.sql` a `031_informes_iva.sql`) configuran las 109 tablas del modelo de datos sin discrepancias.
 - Para desarrollo y tests se utiliza el contenedor o servicio PostgreSQL local (`postgresql+asyncpg://postgres:postgres@localhost:5432/contabilidad`).
 
 ---
