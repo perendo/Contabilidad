@@ -25,7 +25,15 @@ from base import Base
 class CobroConciliado(Base):
     __tablename__ = "cobro_conciliado"
     __table_args__ = (
-        UniqueConstraint("empresa_id", "movimiento_id"),
+        # Nombre explicito, por la colision con el `("empresa_id", "id")` de abajo: la
+        # convencion de nombres usa solo la primera columna y las dos empiezan por
+        # `empresa_id`. Es la deduplicacion del cruce entre conciliacion y remesa: un
+        # movimiento bancario no se cobra dos veces. Ver `devolucion.py` y el guard
+        # `test_no_hay_dos_restricciones_con_el_mismo_nombre`.
+        UniqueConstraint(
+            "empresa_id", "movimiento_id",
+            name="uq_cobro_conciliado_empresa_movimiento",
+        ),
         UniqueConstraint("empresa_id", "id"),
         ForeignKeyConstraint(
             ["empresa_id", "recibo_remesa_id"],

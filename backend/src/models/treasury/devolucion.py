@@ -36,7 +36,16 @@ class EstadoReclamacion(str, Enum):
 class DevolucionRecibo(Base):
     __tablename__ = "devolucion_recibo"
     __table_args__ = (
-        UniqueConstraint("empresa_id", "identificador_externo"),
+        # Nombre explicito: la convencion `uq_%(table_name)s_%(column_0_name)s` daria
+        # `uq_devolucion_recibo_empresa_id`, que ya usa el `UniqueConstraint`
+        # de ("empresa_id", "id") de abajo. PostgreSQL no admite dos restricciones con
+        # el mismo nombre en una tabla y la tabla no se podria crear; SQLite si, que es
+        # por lo que 54/54 tareas de SPEC-020 se cerraron sin que se notara.
+        # Guard: `test_no_hay_dos_restricciones_con_el_mismo_nombre`.
+        UniqueConstraint(
+            "empresa_id", "identificador_externo",
+            name="uq_devolucion_recibo_empresa_identificador",
+        ),
         UniqueConstraint("empresa_id", "id"),
         ForeignKeyConstraint(
             ["empresa_id", "recibo_remesa_id"],

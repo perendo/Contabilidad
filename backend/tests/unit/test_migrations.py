@@ -1,4 +1,4 @@
-"""Migration inventory (SPEC-001/002/003/004).
+﻿"""Migration inventory (SPEC-001/002/003/004).
 
 El DDL PostgreSQL no se puede ejecutar sin una instancia PG; estos tests
 protegen el inventario y el orden de dependencias que aplica `db.migrate`.
@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+
+from esquema_deuda import FK_CIEGAS_AL_TENANT, REFERENCIAS_SIN_FK
+from esquema_deuda import TABLAS_SIN_MIGRACION as _TABLAS_SIN_MIGRACION
 
 from db.migrate import MIGRATIONS_DIR, ORDEN_PREFERENTE, archivos_ordenados
 
@@ -43,6 +46,13 @@ ESPERADAS = [
     "022_favoritos.sql",
     "023_seed_demo.sql",
     "024_conciliacion.sql",
+    "025_prevision_plan_manual.sql",
+    "026_manifiesto_n_bloques.sql",
+    "027_maestros_comerciales.sql",
+    "028_cobros_vencimientos.sql",
+    "029_remesas_complemento.sql",
+    "030_inmovilizado_completo.sql",
+    "031_informes_iva.sql",
 ]
 
 
@@ -199,54 +209,19 @@ def test_migracion_documentos_declara_inmutabilidad_y_huella() -> None:
 # Lo que el inventario NO vigila por si solo
 # ---------------------------------------------------------------------------
 
-#: Tablas del ORM que **no** tienen migracion. No es una lista de permitidos por
-#: capricho: es la deuda real, medida, y la unica forma de que no crezca sin que
-#: nadie se entere. Solo puede ENCOGERSE.
+#: La deuda vive en UN solo sitio, `tests/esquema_deuda.py`, y se importa aqui y
+#: en `tests/integration/test_esquema_completo.py`.
 #:
-#: Por que existe esta lista: SPEC-013 se cerro con 54/54 tareas y todas sus puertas
-#: en verde, y aun asi sus seis tablas vivian solo en el `create_all` de los tests
-#: de SQLite. Contra PostgreSQL real no existian, `POST /api/v1/extractos` devolvia
-#: 500 y **toda** la superficie de conciliacion era inservible. El inventario de
-#: migraciones no lo ve porque comprueba que las migraciones *declaradas* esten
-#: listadas, no que cada tabla del ORM tenga una. Un modelo sin migracion es
-#: invisible para esa puerta.
+#: El motivo de que no sea una lista local: SPEC-013 se cerro con 54/54 tareas y
+#: todas sus puertas en verde, y aun asi sus seis tablas vivian solo en el
+#: `create_all` de los tests de SQLite. Contra PostgreSQL real no existian,
+#: `POST /api/v1/extractos` devolvia 500 y **toda** la superficie de conciliacion
+#: era inservible. El inventario de migraciones no lo ve porque comprueba que las
+#: migraciones *declaradas* esten listadas, no que cada tabla del ORM tenga una. Un
+#: modelo sin migracion es invisible para esa puerta.
 #:
-#: Corregido para conciliacion en 024. Las 27 que quedan son de SPEC-005/007/008/
-#: 010/011/012/014/020 y son trabajo aparte.
-TABLAS_SIN_MIGRACION: set[str] = {
-    # SPEC-004 / SPEC-012 (informes y libros de IVA)
-    "configuracion_informe",
-    "configuracion_sii",
-    "exportacion_modelo",
-    "formulacion_cuentas_anuales",
-    "iva_diferido_caja",
-    "periodo_fiscal",
-    "clasificacion_efe",
-    # SPEC-007 (facturación)
-    "factura",
-    "factura_linea",
-    "serie_factura",
-    # SPEC-008 / SPEC-011 (terceros y vencimientos)
-    "tercero",
-    "tercero_subcuenta",
-    "vencimiento",
-    "cobro_pago",
-    # SPEC-014 (inmovilizado)
-    "activo_inmovilizado",
-    "amortizacion_generada",
-    "baja_activo",
-    "plan_amortizacion",
-    # SPEC-020 (remesas SEPA)
-    "blob_fichero",
-    "cobro_conciliado",
-    "condicion_pronto_pago",
-    "devolucion_recibo",
-    "mandato_sepa",
-    "recibo_remesa",
-    "reclamacion",
-    "remesa",
-    "secuencia_remesa",
-}
+#: Y dos listas, una por test, se separan en cuanto una se actualiza y la otra no.
+TABLAS_SIN_MIGRACION = _TABLAS_SIN_MIGRACION
 
 
 def _tablas_del_orm() -> set[str]:
@@ -306,8 +281,123 @@ def test_la_lista_de_tablas_sin_migracion_no_nombra_tablas_inventadas() -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Las referencias que el modelo deja sueltas, y la decision de dejarlas sueltas
+# ---------------------------------------------------------------------------
+
+
+def _referencias_sueltas_del_orm() -> set[tuple[str, str]]:
+    """Columnas que parecen una referencia y no declaran clave foranea.
+
+    Se calculan importando el ORM, no leyendo el texto del modelo: un `re` sobre
+    el codigo no distingue una FK de una columna que se parece a una FK, que es
+    justo el caso que importa (una FK a una sola columna se lee igual que un
+    UUID suelto).
+    """
+    import sqlalchemy as sa
+
+    import models  # noqa: F401  (registra las tablas)
+    from base import Base
+
+    sueltas: set[tuple[str, str]] = set()
+    for nombre, tabla in Base.metadata.tables.items():
+        con_fk = {fk.parent.name for fk in tabla.foreign_keys}
+        for columna in tabla.columns:
+            if columna.name in con_fk or columna.name in ("id", "empresa_id"):
+                continue
+            if not isinstance(columna.type, (sa.Uuid, sa.Integer, sa.String)):
+                continue
+            if not columna.name.endswith("_id") and not columna.name.endswith("_id_"):
+                continue
+            sueltas.add((nombre, columna.name))
+    return sueltas
+
+
+def test_la_lista_de_referencias_sin_fk_no_miente() -> None:
+    """Ninguna referencia suelta se queda fuera de la lista.
+
+    La lista se decidio el 2026-09-29: migrar los modelos tal cual. Eso es una
+    decision con fecha y con motivo, no un olvido, asi que tiene que seguir
+    abanderada. Si aparece una referencia suelta nueva (una spec nueva, o un
+    campo anadido a una tabla existente), este test falla.
+    """
+    sueltas = _referencias_sueltas_del_orm()
+    sin_anotar = sueltas - REFERENCIAS_SIN_FK
+    assert not sin_anotar, (
+        f"referencias sin clave foranea que no estan en REFERENCIAS_SIN_FK: "
+        f"{sorted(sin_anotar)}. Anadelas con su motivo, o declara la FK en el "
+        "modelo y borralas de la lista"
+    )
+
+
+def test_ninguna_referencia_anotada_declara_ya_clave_foranea() -> None:
+    """La otra mitad: si a `tercero_subcuenta.tercero_id` se le anade la FK, la
+    lista tiene que decir que ya no es deuda."""
+    sueltas = _referencias_sueltas_del_orm()
+    ya_resueltas = REFERENCIAS_SIN_FK - sueltas
+    assert not ya_resueltas, (
+        f"ya tienen clave foranea, borralas de REFERENCIAS_SIN_FK: {sorted(ya_resueltas)}"
+    )
+
+
+def test_las_fk_compuestas_por_empresa_no_dejan_huecos() -> None:
+    """Una FK a una tabla con `empresa_id` tiene que llevar `empresa_id` en su anchura.
+
+    El criterio **no** es el ancho, porque hay FKs de una sola columna que son
+    correctas: `empresa_id -> companies.id`, `user_id -> users.id` o
+    `permiso_id -> permiso_operacion.id` apuntan a tablas que no tienen dimension
+    de empresa, y ahi una columna basta. El agujero es cuando la FK de una sola
+    columna apunta a una tabla que **si** lleva `empresa_id`: ahi no se impide que
+    una fila referencie a otra empresa, porque la FK no mira la empresa.
+
+    Se comprueba aqui, en el sitio donde se decide, y no en una migracion ya
+    escrita: al escribirla habria que corregir el modelo.
+    """
+    import models  # noqa: F401
+    from base import Base
+
+    sueltas = {
+        # La clave es `tabla.columna`, sin destino, para que sea comparable con
+        # `FK_CIEGAS_AL_TENANT`. El destino va solo en el mensaje, que es donde
+        # hace falta leerlo.
+        f"{tabla.name}.{fk.parent.name}"
+        for tabla in Base.metadata.tables.values()
+        for fk in tabla.foreign_keys
+        if len(fk.constraint.columns) == 1
+        and "empresa_id" in Base.metadata.tables[fk.column.table.name].columns
+    }
+    nuevas = sueltas - FK_CIEGAS_AL_TENANT
+    assert not nuevas, (
+        "claves foraneas de una sola columna a una tabla que si tiene empresa_id, "
+        f"y que por tanto no la miran: {sorted(nuevas)}. Declaralas en el modelo "
+        "como compuestas, o anadelas a FK_CIEGAS_AL_TENANT explicando por que"
+    )
+
+
+def test_la_lista_de_fk_ciegas_al_tenant_no_miente() -> None:
+    """La lista de excepciones no puede tornar a estar justificada.
+
+    Si `evento_auditoria_acceso.rol_id` pasa a ser compuesta, hay que borrarla: una
+    lista de excepciones que se queda de mas es una lista que ya no significa nada.
+    """
+    import models  # noqa: F401
+    from base import Base
+
+    reales = {
+        f"{tabla.name}.{fk.parent.name}"
+        for tabla in Base.metadata.tables.values()
+        for fk in tabla.foreign_keys
+        if len(fk.constraint.columns) == 1
+        and "empresa_id" in Base.metadata.tables[fk.column.table.name].columns
+    }
+    justificadas = FK_CIEGAS_AL_TENANT - reales
+    assert not justificadas, (
+        f"ya no son ciegas al tenant, borralas de FK_CIEGAS_AL_TENANT: {sorted(justificadas)}"
+    )
+
+
 def test_la_migracion_de_conciliacion_crea_las_seis_tablas() -> None:
-    """Las seis de SPEC-013, una a una: es la lista concreta que se corrigió."""
+    """Las seis de SPEC-013, una a una: es la lista concreta que se corrigiÃ³."""
     contenido = (MIGRATIONS_DIR / "024_conciliacion.sql").read_text(encoding="utf-8")
     for tabla in (
         "extracto_bancario",

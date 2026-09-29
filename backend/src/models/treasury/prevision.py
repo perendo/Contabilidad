@@ -35,6 +35,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     Enum as SqlEnum,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from base import Base
@@ -96,7 +97,9 @@ class PrevisionTesoreria(Base):
     #: temporal: al regenerar con otro rango se re-expande desde aqui, de modo
     #: que un pago mensual siga cubriendo los meses nuevos y una reprogramacion
     #: (alerta de liquidez) se conserve.
-    plan_manual: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    plan_manual: Mapped[list | None] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=True
+    )
     estado: Mapped[EstadoPrevision] = mapped_column(
         SqlEnum(EstadoPrevision, name="prevision_estado"),
         nullable=False,

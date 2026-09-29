@@ -37,7 +37,16 @@ class ReciboEstado(str, Enum):
 class ReciboRemesa(Base):
     __tablename__ = "recibo_remesa"
     __table_args__ = (
-        UniqueConstraint("empresa_id", "remesa_id", "vencimiento_id"),
+        # Nombre explicito, y no el de la convencion. La convencion de `base.py` es
+        # `uq_%(table_name)s_%(column_0_name)s`, que aqui daria
+        # `uq_recibo_remesa_empresa_id`... que es justo el nombre que ya lleva el
+        # `UniqueConstraint("empresa_id", "id")` de mas abajo. En SQLite los nombres de
+        # restriccion pueden repetirse y no se nota; en PostgreSQL no, y la tabla no se
+        # podria crear. Guard: `test_no_hay_dos_restricciones_con_el_mismo_nombre`.
+        UniqueConstraint(
+            "empresa_id", "remesa_id", "vencimiento_id",
+            name="uq_recibo_remesa_empresa_remesa_vencimiento",
+        ),
         Index(
             "uq_recibo_remesa_empresa_vencimiento",
             "empresa_id",

@@ -63,7 +63,13 @@ class ExportacionModelo(Base):
     contenido_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     fichero_json: Mapped[dict] = mapped_column(JSON, nullable=False)
     estado: Mapped[EstadoExportacion] = mapped_column(
-        SqlEnum(EstadoExportacion, name="estado_exportacion"),
+        # Sufijo por la misma razon que en `periodo_fiscal`: `models.export` ya usa
+        # `estado_exportacion` para los estados de una exportacion integral
+        # ('en_proceso', 'lista', 'fallida'), que no son estos. En PostgreSQL un
+        # tipo se define una vez y en SQLite no hay ENUM, asi que la colision solo
+        # aparece al escribir la migracion. Guard:
+        # `test_no_hay_dos_enums_con_el_mismo_nombre_y_valores_distintos`.
+        SqlEnum(EstadoExportacion, name="estado_exportacion_modelo"),
         nullable=False,
         default=EstadoExportacion.generado,
     )

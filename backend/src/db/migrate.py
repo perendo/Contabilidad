@@ -52,6 +52,30 @@ ORDEN_PREFERENTE: tuple[str, ...] = (
     # SPEC-013 se cerro sin migracion; esta la anade al final, despues de
     # `account_plan` (001) que es de donde salen las FKs de `cuenta_id`.
     "024_conciliacion.sql",
+    # Columna que el modelo de SPEC-027 declara y `018_cashflow.sql` no creo,
+    # porque la 018 ya estaba aplicada. Es un ALTER TABLE sobre una tabla existente.
+    "025_prevision_plan_manual.sql",
+    # El default que le falta a `manifiesto_exportacion.n_bloques`. Va despues de 020
+    # (que crea la columna) y **antes** que 027-031, que no dependen de ella: el numero
+    # esta elegido por legibilidad del historial, no por dependencia.
+    "026_manifiesto_n_bloques.sql",
+    # Grupo 1 de las 27. Va despues de 003 (`journal_entry`, FK de `factura.asiento_id`)
+    # y de 015 (`tipo_retencion_irpf`, que comparte con `factura_linea`).
+    "027_maestros_comerciales.sql",
+    # Grupo 2 de las 27. No depende de nada de las 27 (las referencias a `tercero` y
+    # `factura` quedan sueltas, ver tests/esquema_deuda.py), asi que el numero es
+    # solo por orden de lectura, no por dependencias.
+    "028_cobros_vencimientos.sql",
+    # Grupo 3 de las 27 (remesas SEPA). No depende de 027/028: las referencias a
+    # `tercero`, `factura` y `vencimiento` quedan sueltas (tests/esquema_deuda.py), y la
+    # unica FK que cruza a otra migracion es a `journal_entry` (003).
+    "029_remesas_complemento.sql",
+    # Grupo 4 de las 27 (inmovilizado). Va despues de 001 (`account_plan`, las tres
+    # FKs de cuentas del activo) y de 003 (`journal_entry`, FKs de asiento).
+    "030_inmovilizado_completo.sql",
+    # Grupo 5 de las 27 (informes anuales y libros de IVA), y ultima de las 27.
+    # No declara ninguna FK, asi que no depende de nadie; el numero es por historial.
+    "031_informes_iva.sql",
 )
 
 

@@ -23,7 +23,14 @@ class MandatoEstado(str, Enum):
 class MandatoSepa(Base):
     __tablename__ = "mandato_sepa"
     __table_args__ = (
-        UniqueConstraint("empresa_id", "tercero_id", "mandato_ref"),
+        # Nombre explicito, por la colision con el `("empresa_id", "id")` de abajo: la
+        # convencion usa solo la primera columna y aqui las dos empiezan por
+        # `empresa_id`. Ver `devolucion.py` y el guard
+        # `test_no_hay_dos_restricciones_con_el_mismo_nombre`.
+        UniqueConstraint(
+            "empresa_id", "tercero_id", "mandato_ref",
+            name="uq_mandato_sepa_empresa_tercero_ref",
+        ),
         UniqueConstraint("empresa_id", "id"),
     )
 

@@ -16,7 +16,14 @@ from base import Base
 
 class SecuenciaRemesa(Base):
     __tablename__ = "secuencia_remesa"
-    __table_args__ = (UniqueConstraint("empresa_id", "ejercicio"),)
+    __table_args__ = (
+        # El nombre lo ponia la convencion como `uq_secuencia_remesa_empresa_id`, que
+        # dice "clave de empresa" y en realidad es la clave de empresa **y ejercicio**:
+        # hay una fila por ano. En un `\d` de PostgreSQL no se entiende, y la
+        # convencion (`uq_%(table_name)s_%(column_0_name)s`) es la que hace que dos
+        # unicos que empiezan por `empresa_id` choquen entre si.
+        UniqueConstraint("empresa_id", "ejercicio", name="uq_secuencia_remesa_empresa_ejercicio"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     empresa_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)

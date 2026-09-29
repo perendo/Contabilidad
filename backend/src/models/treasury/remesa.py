@@ -50,7 +50,14 @@ class RemesaEstado(str, Enum):
 class Remesa(Base):
     __tablename__ = "remesa"
     __table_args__ = (
-        UniqueConstraint("empresa_id", "ejercicio", "numero_remesa"),
+        # Nombre explicito, por la colision con el `("empresa_id", "id")` de abajo. La
+        # correlatividad de remesas (sin saltos por empresa y ejercicio) es
+        # `ejercicio` + `numero_remesa`; el `("empresa_id", "id")` existe para que las
+        # FKs compuestas de `recibo_remesa` puedan apuntar aqui. Ver `devolucion.py`.
+        UniqueConstraint(
+            "empresa_id", "ejercicio", "numero_remesa",
+            name="uq_remesa_empresa_ejercicio_numero",
+        ),
         UniqueConstraint("empresa_id", "id"),
         CheckConstraint("importe_total > 0", name="importe_total_positive"),
     )

@@ -56,7 +56,16 @@ class PeriodoFiscal(Base):
     fecha_inicio: Mapped[date] = mapped_column(Date, nullable=False)
     fecha_fin: Mapped[date] = mapped_column(Date, nullable=False)
     estado: Mapped[EstadoPeriodo] = mapped_column(
-        SqlEnum(EstadoPeriodo, name="estado_periodo"),
+        # El nombre del tipo lleva el sufijo porque `models.closing.periodo_cerrado`
+        # ya usa `estado_periodo` para los estados de un periodo de cierre
+        # ('abierto', 'cerrado', 'reabierto_ajuste', 'cerrado_ajustado') y en
+        # PostgreSQL un tipo solo se define una vez. Los valores de aqui son
+        # distintos, asi que compartir el tipo no es posible.
+        #
+        # SQLite no tiene ENUM, de modo que esta colision era invisible hasta que
+        # ha habido que escribir la migracion de esta tabla. El guard que lo
+        # vigila es `test_no_hay_dos_enums_con_el_mismo_nombre_y_valores_distintos`.
+        SqlEnum(EstadoPeriodo, name="estado_periodo_fiscal"),
         nullable=False,
         default=EstadoPeriodo.pendiente,
     )
