@@ -2770,3 +2770,22 @@ parser contra el. `Data/` esta ahora en `.gitignore`.
   que el formato se lea bien. El quinto, `test_toda_tabla_del_orm_tiene_migracion`,
   comprueba algo mas pequeno y mas general: que ninguna tabla nueva se quede fuera del
   esquema. Ese es el que habria parado la spec entera.
+
+## 53. Unificación en PostgreSQL Exclusivo y Tratamiento de Reparaciones (2026-09-29)
+
+### 1. Descarte Definitivo de SQLite y Unificación en PostgreSQL
+- **Diagnóstico**: La convivencia histórica con SQLite en tests enmascaró durante 31 specs que 27 tablas del ORM carecían de migración SQL física, además de permitir colisiones de nombres de enums y restricciones duplicadas que SQLite ignoraba pero que en PostgreSQL generaban errores críticos (ver `reparacion.md`).
+- **Decisión**: El proyecto adopta **PostgreSQL como motor único oficial**. Toda la lógica de negocio, validaciones DDL, índices compuestos y disparadores de auditoría e inmutabilidad se ejecutan y auditan exclusivamente sobre PostgreSQL 16+.
+- **Validación**: Cobertura completa de migraciones verificada con el comparador de esquemas (`src/db/esquema.py` y `test_esquema_completo.py`), confirmando 0 discrepancias reales entre los 109 modelos SQLAlchemy y las 110 tablas en la base de datos PostgreSQL tras aplicar las 32 migraciones.
+
+### 2. Tratamiento de Duplicados (`reparacion.md`)
+- **`config_sii` vs `configuracion_sii`**:
+  - `configuracion_sii` (SPEC-012, migración `031_informes_iva.sql`) almacena la parametrización técnica de enlaces.
+  - `config_sii` (SPEC-029, migración `020_export.sql`) almacena la condición de obligación y regímenes para exportación manual.
+  - Coexistencia documentada: `services.export.sii.config_efectiva` resuelve con prioridad `config_sii` y delega en `configuracion_sii` para preservar compatibilidad retroactiva sin romper endpoints existentes.
+
+### 3. Integridad Referencial y Referencias Anotadas (`REFERENCIAS_SIN_FK`)
+- **Inventario de 51 referencias**: Mapeadas exhaustivamente en `tests/esquema_deuda.py`:
+  - **Pistas inmutables y auditoría**: Referencias históricas (`journal_entry.original_id`, `audit_log.entidad_id`, `blob_id`, `usuario_id`) se conservan sin FK restrictiva para salvaguardar el principio de inmutabilidad (Constitución II), impidiendo bloqueos o eliminaciones en cascada.
+  - **Referencias operativas**: Se mantiene la protección multi-tenant mediante aislamiento en aplicación (`Depends(get_empresa_id)` e índices compuestos), planificando el endurecimiento selectivo a FK compuestas `(empresa_id, id)` conforme los flujos de `flush` lo requieran.
+- **FK ciega al tenant**: `evento_auditoria_acceso.rol_id` documentada en `FK_CIEGAS_AL_TENANT` para corrección estructurada.
