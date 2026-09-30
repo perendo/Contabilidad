@@ -10,8 +10,7 @@
  * - El estado se distinge con **color Y con etiqueta de texto**. Un color solo
  *   deja fuera a quien no distingue rojo de verde, y ademas el estado del ejercicio
  *   es informacion critica, no decorativa (FR-031, research D7).
- * - Se ve **cuantos asientos lleva cada ejercicio**, que es lo que permite decidir
- *   en cual se esta sin abrir el diario (FR-017).
+ * - Se ve **cuantos asientos lleva cada ejercicio**, que es lo que permite decidir *   en cual se esta sin abrir el diario (FR-017).
  * - El ejercicio anterior abierto se marca como `cerrando`, no como `abierto`: la
  *   diferencia importa y un usuario que cierra el ano no la va a leer sola.
  * - El cerrado **no** es seleccionable y se explica por que.
@@ -23,26 +22,16 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-
 import { useSesion } from "./SessionContext";
 import type { EjercicioResuelto } from "./tipos";
 
-/** Clase de Tailwind por estado. El color nunca va solo: va con `etiqueta`. */
 const CLASES: Record<string, string> = {
-  abierto_actual: "text-slate-900",
-  abierto_anterior: "text-amber-700",
-  con_apertura: "text-slate-900",
-  cerrado: "text-slate-400 line-through",
+  abierto_actual: "text-slate-200",
+  abierto_anterior: "text-amber-400",
+  con_apertura: "text-slate-200",
+  cerrado: "text-slate-500 line-through",
 };
 
-/**
- * Texto que acompaña al color. Es lo que hace el estado legible sin color.
- *
- * Se exporta porque `SessionMenu` pinta la lista de ejercicios del menu de sesion y
- * tiene que pintar el estado **igual** que aqui: la regla de FR-031 ("el estado no
- * depende solo del color") son dos funciones, y dos copias se separan en cuanto una
- * de las dos se toca.
- */
 export function etiqueta(estado: string, esActual: boolean): string | null {
   if (estado === "cerrado") return "cerrado";
   if (estado === "con_apertura") return "apertura";
@@ -50,7 +39,6 @@ export function etiqueta(estado: string, esActual: boolean): string | null {
   return null;
 }
 
-/** Clase de estado de un ejercicio. Se exporta por el mismo motivo que `etiqueta`. */
 export function clase(ejercicio: EjercicioResuelto): string {
   const base = CLASES[ejercicio.estado] ?? CLASES.abierto_actual;
   return `${base} ${ejercicio.es_actual ? "font-semibold" : ""}`;
@@ -64,13 +52,11 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
   const boton = useRef<HTMLButtonElement>(null);
   const listaId = useId();
 
-  // `ejercicios` y `seleccionables` van en `useMemo` porque entran en las
-  // dependencias de un `useEffect`. Sin memo, `contexto?.ejercicios ?? []` crea un
-  // array nuevo en cada render y el efecto se dispara siempre.
   const ejercicios = useMemo(
     () => contexto?.ejercicios ?? [],
     [contexto],
   );
+
   const seleccionables = useMemo(
     () => ejercicios.filter((e) => e.es_seleccionable),
     [ejercicios],
@@ -82,8 +68,6 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
     setActivo(i >= 0 ? i : 0);
   }, [abierto, ejercicios, ejercicio]);
 
-  // Cerrar al hacer click fuera. Sin esto el desplegable se queda pegado al
-  // cambiar de pagina y parece un fallo de la pantalla anterior.
   useEffect(() => {
     if (!abierto) return;
     const fuera = (evento: MouseEvent) => {
@@ -125,13 +109,13 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
 
   if (!ejercicio) {
     return (
-      <div ref={contenedor} className="px-3 py-1 text-sm text-slate-500">
+      <div ref={contenedor} className="px-3 py-1.5 text-xs text-slate-500">
         {cargando ? "Cargando ejercicio…" : "Sin ejercicio disponible"}
         {contexto && ejercicios.length === 0 && (
           <button
             type="button"
             onClick={() => void recargar()}
-            className="ml-2 underline"
+            className="ml-2 underline text-emerald-400"
           >
             Reintentar
           </button>
@@ -140,14 +124,10 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
     );
   }
 
-  // El caso que motiva la feature: contabilizar en dos ejercicios a la vez. Con un
-  // boton, cambiar de 2026 a 2025 es una pulsacion, y se ven los dos contadores a la
-  // vez. Es el atajo que un contador hace falta el 31 de diciembre.
   const anterior = ejercicios.find(
     (e) => e.ejercicio < ejercicio.ejercicio && e.es_seleccionable,
   );
   const mostrarAtajo = anterior !== undefined && !ejercicio.es_actual;
-
   const textoActivo = etiqueta(ejercicio.estado, ejercicio.es_actual);
 
   return (
@@ -157,7 +137,7 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
           type="button"
           onClick={() => void cambiarEjercicio(anterior.ejercicio)}
           title={`Cambiar a ${anterior.ejercicio}, que tiene ${anterior.n_asientos} asientos`}
-          className="mb-1 flex w-full items-center justify-between rounded border border-amber-300 bg-amber-50 px-3 py-1 text-xs text-amber-900 hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-amber-700"
+          className="mb-1 flex w-full items-center justify-between rounded border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-xs text-amber-300 hover:bg-amber-500/20 focus-visible:outline-2 focus-visible:outline-amber-500"
         >
           <span>
             Ejercicio {anterior.ejercicio}: {anterior.n_asientos} asientos
@@ -165,6 +145,7 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
           <span aria-hidden="true">→</span>
         </button>
       )}
+
       <button
         ref={boton}
         type="button"
@@ -174,18 +155,42 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
         aria-expanded={abierto}
         aria-controls={abierto ? listaId : undefined}
         className={[
-          "flex w-full items-center gap-2 rounded px-3 py-1.5 text-sm",
-          "hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-slate-900",
-          compacto ? "justify-center" : "justify-start",
+          "flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 px-3 py-1.5 rounded-lg text-xs text-slate-200 transition-colors",
+          "hover:bg-slate-800 hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-emerald-500",
+          compacto ? "w-full justify-between" : "",
         ].join(" ")}
       >
-        <span className="font-medium">{ejercicio.ejercicio}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-3.5 h-3.5 text-emerald-400 shrink-0"
+        >
+          <path d="M8 2v4" />
+          <path d="M16 2v4" />
+          <rect width="18" height="18" x="3" y="4" rx="2" />
+          <path d="M3 10h18" />
+        </svg>
+
+        <span className="font-medium">{ejercicio.ejercicio} ({textoActivo ?? "Abierto"})</span>
+
         {textoActivo && (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800 font-semibold">
             {textoActivo}
           </span>
         )}
-        <span className="text-xs text-slate-500">{ejercicio.n_asientos} asientos</span>
+
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 10 6"
+          className="h-1.5 w-2 shrink-0 text-slate-400 ml-1"
+        >
+          <path d="M0 0h10L5 6z" fill="currentColor" />
+        </svg>
       </button>
 
       {abierto && (
@@ -194,7 +199,7 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
           role="listbox"
           aria-label="Ejercicio activo"
           tabIndex={-1}
-          className="absolute right-0 z-30 mt-1 w-72 rounded border border-slate-200 bg-white shadow-lg"
+          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-80 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-1.5 shadow-2xl"
         >
           {ejercicios.map((e, i) => {
             const texto = etiqueta(e.estado, e.es_actual);
@@ -209,20 +214,24 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
                 onClick={() => e.es_seleccionable && void elegir(e)}
                 onKeyDown={alTeclado}
                 className={[
-                  "flex items-center justify-between px-3 py-2 text-sm",
-                  e.es_seleccionable ? "cursor-pointer hover:bg-slate-50" : "cursor-not-allowed",
-                  i === activo && e.es_seleccionable ? "bg-slate-100" : "",
+                  "flex items-center justify-between px-3 py-2 text-xs rounded-lg transition-colors",
+                  e.es_seleccionable ? "cursor-pointer" : "cursor-not-allowed opacity-50",
+                  esActivo
+                    ? "bg-emerald-500/15 font-semibold text-emerald-300 border border-emerald-500/20"
+                    : i === activo && e.es_seleccionable
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-300 hover:bg-slate-900",
                 ].join(" ")}
               >
                 <span className={clase(e)}>
                   {e.ejercicio}
                   {texto && (
-                    <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs">
+                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
                       {texto}
                     </span>
                   )}
                 </span>
-                <span className="text-xs text-slate-500">{e.n_asientos}</span>
+                <span className="text-[11px] font-mono text-slate-500">{e.n_asientos} asientos</span>
               </li>
             );
           })}

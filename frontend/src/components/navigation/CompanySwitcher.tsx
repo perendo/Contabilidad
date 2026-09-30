@@ -15,7 +15,6 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-
 import { useSesion } from "./SessionContext";
 
 export interface EmpresaResumen {
@@ -47,8 +46,6 @@ export default function CompanySwitcher({
     return () => document.removeEventListener("mousedown", fuera);
   }, [abierto]);
 
-  // Sin empresas no hay nada que cambiar, pero el hueco se conserva para que la
-  // zona de contexto no se descomponga: se ve que hay una empresa y no hay otras.
   const unica = empresas.length <= 1;
 
   const elegir = async (empresa: EmpresaResumen) => {
@@ -97,21 +94,39 @@ export default function CompanySwitcher({
         aria-expanded={abierto}
         title={unica ? "Solo tiene acceso a esta empresa" : "Cambiar de empresa"}
         className={[
-                      "text-xs",
-          "flex w-full items-center gap-2 rounded px-3 py-1.5 text-sm",
-          "hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-slate-900",
-          unica ? "cursor-default" : "",
-          compacto ? "justify-center" : "justify-start",
+          "flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 px-3 py-1.5 rounded-lg text-xs text-slate-200 transition-colors",
+          unica ? "cursor-default" : "hover:bg-slate-800 hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-emerald-500",
+          compacto ? "w-full justify-between" : "",
         ].join(" ")}
       >
-        <span className="truncate font-medium">
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-3.5 h-3.5 text-indigo-400 shrink-0"
+        >
+          <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
+          <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
+          <path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" />
+          <path d="M10 6h4" />
+          <path d="M10 10h4" />
+          <path d="M10 14h4" />
+          <path d="M10 18h4" />
+        </svg>
+
+        <span className="truncate font-medium max-w-[14rem]">
           {cargando && !empresa ? "Cargando…" : (empresa?.nombre ?? "Sin empresa")}
         </span>
+
         {!unica && (
           <svg
             aria-hidden="true"
             viewBox="0 0 10 6"
-            className="h-1.5 w-2.5 shrink-0 text-slate-400"
+            className="h-1.5 w-2 shrink-0 text-slate-400 ml-1"
           >
             <path d="M0 0h10L5 6z" fill="currentColor" />
           </svg>
@@ -123,7 +138,7 @@ export default function CompanySwitcher({
           role="listbox"
           aria-label="Empresa activa"
           tabIndex={-1}
-          className="absolute right-0 z-30 mt-1 w-72 rounded border border-slate-200 bg-white shadow-lg"
+          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-72 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-1.5 shadow-2xl"
         >
           {empresas.map((e, i) => {
             const esActiva = e.company_id === empresa?.id;
@@ -135,14 +150,17 @@ export default function CompanySwitcher({
                 onClick={() => void elegir(e)}
                 onKeyDown={alTeclado}
                 className={[
-                      "text-xs",
-                  "cursor-pointer px-3 py-2 text-sm hover:bg-slate-50",
-                  i === indice ? "bg-slate-100" : "",
+                  "cursor-pointer px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between",
+                  esActiva
+                    ? "bg-emerald-500/15 font-semibold text-emerald-300 border border-emerald-500/20"
+                    : i === indice
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-300 hover:bg-slate-900",
                 ].join(" ")}
               >
-                <span className={esActiva ? "font-semibold" : ""}>{e.razon_social}</span>
+                <span className="truncate">{e.razon_social}</span>
                 {e.nif && (
-                  <span className="ml-2 text-xs text-slate-500">{e.nif}</span>
+                  <span className="ml-2 text-[10px] font-mono text-slate-500 shrink-0">{e.nif}</span>
                 )}
               </li>
             );

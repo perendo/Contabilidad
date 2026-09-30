@@ -25,7 +25,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-
 import { get } from "@/services/client";
 import { useSesion } from "./SessionContext";
 import CompanySwitcher, { type EmpresaResumen } from "./CompanySwitcher";
@@ -65,14 +64,6 @@ export default function ContextZone({
     empresasInyectadas ?? [],
   );
 
-  // La lista de empresas se pide aqui y no se recibe por props porque quien la consume
-  // es la zona de contexto, y quien la tiene que montar es `layout.tsx`, que no tiene
-  // sesion: si la lista dependiera del padre, `layout` tendria que hacer la peticion o
-  // ningun componente se la pasa. Con el fetch local, la zona funciona montada sola.
-  //
-  // Un fallo aqui NO es un fallo de contexto: el usuario puede trabajar en la empresa
-  // activa aunque no pueda cambiar. Se deja la lista vacia y el selector se limita a
-  // mostrar la actual, en vez de tapar la pantalla con un error.
   const cargarEmpresas = useCallback(async () => {
     if (pathname === "/login") return;
     if (empresasInyectadas !== undefined) return;
@@ -104,27 +95,24 @@ export default function ContextZone({
       <div
         role="status"
         aria-live="polite"
-        className="border-b border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-400"
+        className="border-b border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-slate-400"
       >
         Cargando contexto…
       </div>
     );
   }
 
-  // El backend no pudo determinar contexto. Se dice, y se ofrece reintentar: es el
-  // caso borde que anade el spec, y esconderlo dejaria al usuario mirando una
-  // pantalla vacia sin saber que pasa.
   if (!contexto) {
     return (
       <div
         role="alert"
-        className="border-b border-rose-900/40 bg-rose-950/30 px-4 py-2 text-sm text-rose-300"
+        className="border-b border-rose-900/40 bg-rose-950/30 px-4 py-2.5 text-xs text-rose-300"
       >
         {error ?? "No se pudo determinar la empresa ni el ejercicio."}
         <button
           type="button"
           onClick={() => void recargar()}
-          className="ml-3 rounded border border-red-300 px-2 py-0.5 text-xs hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-red-700"
+          className="ml-3 rounded border border-rose-700/60 bg-rose-900/40 px-2.5 py-0.5 text-xs hover:bg-rose-900/80 focus-visible:outline-2 focus-visible:outline-rose-500"
         >
           Reintentar
         </button>
@@ -158,11 +146,12 @@ export default function ContextZone({
             {usuario.nombre}
           </span>
         </div>
+
         {hoja && (
-          <div className="border-t border-slate-800 bg-slate-900/90 px-2 py-2">
+          <div className="border-t border-slate-800 bg-slate-900/90 px-3 py-3 space-y-2">
             <CompanySwitcher empresas={empresas} compacto />
             <ExerciseSwitcher compacto />
-            <div className="mt-1 border-t border-slate-200 pt-1">
+            <div className="mt-2 border-t border-slate-800 pt-2">
               <SessionMenu empresas={empresas} />
             </div>
           </div>
@@ -172,13 +161,28 @@ export default function ContextZone({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
-      <div className="flex items-stretch justify-between gap-4 px-4">
-        <div className="flex items-stretch gap-1 py-1">
+    <header className="sticky top-0 z-40 bg-slate-950/90 border-b border-slate-800 px-4 sm:px-6 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Brand / Logo badge EXACTO a la muestra */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 font-bold text-sm">
+            PGC
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+              <span>Contabilidad PGC Español</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-mono">
+                v1.4.0
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-400">Sistema Contable de Producción</div>
+          </div>
+        </div>
+
+        {/* Tenant & Exercise Switcher Chips con iconos a juego */}
+        <div className="flex items-center flex-wrap gap-2 text-xs">
           <CompanySwitcher empresas={empresas} />
           <ExerciseSwitcher />
-        </div>
-        <div className="flex items-center py-1.5">
           <SessionMenu empresas={empresas} />
         </div>
       </div>
