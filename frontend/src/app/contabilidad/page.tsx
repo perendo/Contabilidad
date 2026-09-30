@@ -5,7 +5,7 @@
  *
  * Muestra el libro diario del ejercicio activo, el último apunte registrado en
  * partida doble estricta con verificación WORM, balance de sumas y saldos, y
- * accesos directos al Plan General Contable.
+ * accesos directos al Plan General Contable y creación de cuentas.
  */
 
 import Link from "next/link";
@@ -78,10 +78,10 @@ export default function ContabilidadPage() {
           </table>
         </div>
 
-        <div className="flex items-center gap-3 pt-2 text-xs">
+        <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
           <Link
             href="/asientos/nuevo"
-            className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold transition-colors"
+            className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-colors"
           >
             Nuevo Asiento Contable
           </Link>
@@ -90,6 +90,15 @@ export default function ContabilidadPage() {
             className="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-medium transition-colors"
           >
             Ver Plan de Cuentas PGC
+          </Link>
+          <Link
+            href="/cuentas/nueva"
+            className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors flex items-center gap-1.5 shadow-sm"
+          >
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+            </svg>
+            Crear Nueva Cuenta / Subcuenta
           </Link>
         </div>
       </div>
