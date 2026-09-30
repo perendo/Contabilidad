@@ -104,7 +104,7 @@ export default function ContextZone({
       <div
         role="status"
         aria-live="polite"
-        className="border-b border-slate-200 bg-white px-4 py-2 text-sm text-slate-500"
+        className="border-b border-slate-800 bg-slate-950 px-4 py-2 text-sm text-slate-400"
       >
         Cargando contexto…
       </div>
@@ -118,7 +118,7 @@ export default function ContextZone({
     return (
       <div
         role="alert"
-        className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800"
+        className="border-b border-rose-900/40 bg-rose-950/30 px-4 py-2 text-sm text-rose-300"
       >
         {error ?? "No se pudo determinar la empresa ni el ejercicio."}
         <button
@@ -137,16 +137,16 @@ export default function ContextZone({
 
   if (compacto) {
     return (
-      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
+      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
         <div className="flex items-center justify-between gap-2 px-3 py-2">
           <button
             type="button"
             onClick={() => setHoja((v) => !v)}
             aria-expanded={hoja}
-            className="flex min-w-0 items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-slate-900"
+            className="flex min-w-0 items-center gap-2 rounded-lg px-2.5 py-1 text-left text-xs bg-slate-900 border border-slate-800 text-slate-200 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-emerald-500"
           >
             <span className="truncate font-medium">{empresa.nombre ?? "Sin empresa"}</span>
-            <span aria-hidden="true" className="text-slate-300">/</span>
+            <span aria-hidden="true" className="text-slate-600">/</span>
             <span className="shrink-0 font-medium">{ejercicio.ejercicio}</span>
             {ejercicio.estado !== "abierto" && (
               <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
@@ -154,12 +154,12 @@ export default function ContextZone({
               </span>
             )}
           </button>
-          <span className="shrink-0 truncate text-xs text-slate-600" title={usuario.email}>
+          <span className="shrink-0 truncate text-xs text-slate-400" title={usuario.email}>
             {usuario.nombre}
           </span>
         </div>
         {hoja && (
-          <div className="border-t border-slate-200 bg-slate-50 px-2 py-2">
+          <div className="border-t border-slate-800 bg-slate-900/90 px-2 py-2">
             <CompanySwitcher empresas={empresas} compacto />
             <ExerciseSwitcher compacto />
             <div className="mt-1 border-t border-slate-200 pt-1">
@@ -172,7 +172,7 @@ export default function ContextZone({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white">
+    <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/90 backdrop-blur">
       <div className="flex items-stretch justify-between gap-4 px-4">
         <div className="flex items-stretch gap-1 py-1">
           <CompanySwitcher empresas={empresas} />

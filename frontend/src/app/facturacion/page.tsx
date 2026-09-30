@@ -20,8 +20,8 @@
 export default function FacturacionPage() {
   return (
     <section className="space-y-2">
-      <h1 className="text-2xl font-bold text-slate-900">Facturación</h1>
-      <p className="text-sm text-slate-600">Facturas emitidas y recibidas del ejercicio activo, con las series de numeración.</p>
+      <h1 className="text-2xl font-bold text-white">Facturación</h1>
+      <p className="text-sm text-slate-400">Facturas emitidas y recibidas del ejercicio activo, con las series de numeración.</p>
     </section>
   );
 }

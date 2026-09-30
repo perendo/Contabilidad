@@ -32,8 +32,8 @@ export default function MaestrosPage() {
   return (
     <div className="space-y-6">
       <section className="space-y-2">
-        <h1 className="text-2xl font-bold text-slate-900">Maestros</h1>
-        <p className="text-sm text-slate-600">
+        <h1 className="text-2xl font-bold text-white">Maestros</h1>
+        <p className="text-sm text-slate-400">
           Empresas, terceros, plan de cuentas y catálogos que alimentan el resto de la
           aplicación.
         </p>

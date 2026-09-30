@@ -2824,3 +2824,25 @@ parser contra el. `Data/` esta ahora en `.gitignore`.
 ### 3. Pruebas y Verificación
 - Guard específico: `tests/unit/test_migrations.py::test_migracion_cuentas_bancarias_declara_estructura`.
 - Pruebas unitarias de flujo: `tests/unit/test_cuentas_bancarias_tesoreria.py` verificando creación de Banco A y Banco B, rechazo de IBAN duplicado, y generación de asiento contable imputando a la subcuenta contable del banco seleccionado.
+
+## 55. Actualización Visual del Frontend · Identidad Visual y Estilo Unificado (2026-09-30)
+
+### 1. Alineación Estética y Cosmetica con el Simulador Visual
+- **Tema y Paleta Base (`globals.css`)**:
+  - Incorporada capa base Tailwind con fondo oscuro profundo (`bg-slate-950`), texto de alto contraste (`text-slate-100`) y selección destacada en esmeralda (`selection:bg-emerald-500/30 selection:text-emerald-300`).
+- **Rail de Destinos Lateral (`DestinationRail.tsx`)**:
+  - Encabezado sutil «SUPERFICIES M3».
+  - Indicador activo estilizado con borde esmeralda translúcido (`border-emerald-500/30 bg-emerald-500/15 text-emerald-300`).
+  - Badge numérico `032` en el destino de Tesorería.
+  - Tarjeta inferior informativa de inmutabilidad contable (WORM).
+  - Conservación estricta de todos los `<Link>` semánticos y reglas de accesibilidad (FR-009, FR-030).
+- **Zona de Contexto (`ContextZone.tsx`, `CompanySwitcher.tsx`, `ExerciseSwitcher.tsx`, `SessionMenu.tsx`)**:
+  - Selectores con acabado moderno en tarjeta oscura (`bg-slate-900 border-slate-700/80`), dropdowns en `bg-slate-950 border-slate-800` y efectos de hover suaves.
+  - Preservación íntegra de la distinción visual obligatoria del ejercicio (`bg-amber-100` y etiquetas de texto cerrando/cerrado/apertura según FR-031).
+- **Panel de Superficie y Landings (`SurfacePanel.tsx`, `ResumenSuperficie.tsx`, `FavoritesBar.tsx`)**:
+  - Tarjetas de resumen métrico con tipografía reforzada en blanco (`text-white font-bold`) y fondos en `bg-slate-950/80`.
+  - Rejilla de destinos con bordes sutiles `border-slate-800` que reaccionan al foco y al cursor.
+  - Títulos de landings de superficies actualizados a `text-white` y `text-slate-400`.
+- **Integridad de Contratos y Enlaces**:
+  - No se ha alterado ninguna ruta, prop o contrato de enlace ni jerarquía de accesibilidad.
+

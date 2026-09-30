@@ -130,7 +130,7 @@ export default function FavoritesBar({
               <li key={favorito.destino} className="flex items-center">
                 <Link
                   href={destino.ruta}
-                  className="rounded-l border border-slate-200 bg-white px-3 py-1.5 text-sm hover:border-slate-400 focus-visible:outline-2 focus-visible:outline-slate-900"
+                  className="rounded-l-lg border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-200 hover:border-slate-700 hover:bg-slate-900 focus-visible:outline-2 focus-visible:outline-emerald-500"
                 >
                   {destino.etiqueta}
                 </Link>
@@ -188,7 +188,7 @@ function Borrar({
       onClick={() => void onBorrar(destino)}
       title={`Quitar ${etiqueta} de favoritos`}
       aria-label={`Quitar ${etiqueta} de favoritos`}
-      className="rounded-r border border-l-0 border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-500 hover:text-red-700 focus-visible:outline-2 focus-visible:outline-slate-900"
+      className="rounded-r-lg border border-l-0 border-slate-800 bg-slate-950 px-2 py-1.5 text-xs text-slate-400 hover:text-rose-400 hover:bg-slate-900 focus-visible:outline-2 focus-visible:outline-emerald-500"
     >
       <svg aria-hidden="true" viewBox="0 0 10 10" className="h-2.5 w-2.5">
         <path d="M0 0l10 10M10 0L0 10" stroke="currentColor" strokeWidth="1.5" />

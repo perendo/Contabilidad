@@ -120,7 +120,7 @@ export default function ResumenSuperficie({ superficie }: { superficie: string }
   // recién creada. Se dice, porque un panel con la caja vacía parece un error.
   if (datos.ejercicio === null) {
     return (
-      <section aria-label="Resumen" className="rounded-lg border border-slate-200 bg-white p-4">
+      <section aria-label="Resumen" className="rounded-xl border border-slate-800 bg-slate-950/80 p-5 shadow-sm">
         <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Resumen
         </h2>
@@ -133,7 +133,7 @@ export default function ResumenSuperficie({ superficie }: { superficie: string }
   }
 
   return (
-      <section aria-label="Resumen" className="rounded-lg border border-slate-200 bg-white p-4">
+      <section aria-label="Resumen" className="rounded-xl border border-slate-800 bg-slate-950/80 p-5 shadow-sm">
         <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
           Resumen del ejercicio {datos.ejercicio}
         </h2>
@@ -141,19 +141,19 @@ export default function ResumenSuperficie({ superficie }: { superficie: string }
         {datos.metricas.map((metrica) => (
           <div key={metrica.clave}>
             <dt className="text-xs text-slate-500">{metrica.etiqueta}</dt>
-            <dd className="text-xl font-semibold text-slate-900">
+            <dd className="text-xl font-bold text-white">
               {formatear(metrica)}
             </dd>
           </div>
         ))}
       </dl>
       {datos.enlaces.length > 0 && (
-        <ul className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
+        <ul className="mt-4 flex flex-wrap gap-2 border-t border-slate-800/80 pt-3">
           {datos.enlaces.map((enlace) => (
             <li key={enlace.clave}>
               <Link
                 href={enlace.ruta}
-                className="rounded border border-slate-200 px-2 py-1 text-sm text-slate-700 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-slate-900"
+                className="rounded-lg border border-slate-800 bg-slate-900 px-2.5 py-1 text-xs text-slate-300 hover:border-slate-700 hover:bg-slate-800 focus-visible:outline-2 focus-visible:outline-emerald-500"
               >
                 {enlace.etiqueta}
               </Link>

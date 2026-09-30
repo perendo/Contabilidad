@@ -641,3 +641,9 @@ La última línea es la que faltaba cuando la navegación estaba rota. `tsc`, ES
 no que funcione. El guard que sí lo detecta **ejecuta** el mapa de navegación con el `tsc`
 del proyecto y `node`. Si `node` no estuviera, el test se omite con un motivo explícito
 en vez de fingir que se comprobó.
+### Interfaz de Usuario y Navegación (Next.js 15)
+
+El frontend cuenta con un diseño unificado y moderno de alto contraste acorde a la especificación SPEC-031 (Material Design 3):
+- **Rail lateral permanente**: 6 superficies estables (Contabilidad, Facturación, Tesorería, Informes, Fiscal, Maestros).
+- **Zona de contexto**: Empresa activa, ejercicio fiscal (con guards de estado) y menú de sesión.
+- **Resúmenes en tiempo real**: Indicadores contables y de liquidez por ejercicio.

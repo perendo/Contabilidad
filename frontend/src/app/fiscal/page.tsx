@@ -20,8 +20,8 @@
 export default function FiscalPage() {
   return (
     <section className="space-y-2">
-      <h1 className="text-2xl font-bold text-slate-900">Fiscal</h1>
-      <p className="text-sm text-slate-600">Libros de IVA, modelos mensuales y trimestrales, y los regímenes especiales.</p>
+      <h1 className="text-2xl font-bold text-white">Fiscal</h1>
+      <p className="text-sm text-slate-400">Libros de IVA, modelos mensuales y trimestrales, y los regímenes especiales.</p>
     </section>
   );
 }

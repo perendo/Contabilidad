@@ -132,7 +132,7 @@ export default function MobileNav({
               className={[
                 "flex flex-1 flex-col items-center gap-0.5 py-2 text-xs",
                 "focus-visible:outline-2 focus-visible:outline-slate-900",
-                esActiva ? "font-semibold text-slate-900" : "text-slate-600",
+                esActiva ? "font-semibold text-emerald-400" : "text-slate-600",
               ].join(" ")}
             >
               <span

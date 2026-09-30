@@ -20,8 +20,8 @@
 export default function InformesPage() {
   return (
     <section className="space-y-2">
-      <h1 className="text-2xl font-bold text-slate-900">Informes</h1>
-      <p className="text-sm text-slate-600">Estado de formulación de las cuentas anuales y el acceso a balance, PyG y demás informes.</p>
+      <h1 className="text-2xl font-bold text-white">Informes</h1>
+      <p className="text-sm text-slate-400">Estado de formulación de las cuentas anuales y el acceso a balance, PyG y demás informes.</p>
     </section>
   );
 }

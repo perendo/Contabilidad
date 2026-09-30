@@ -62,7 +62,7 @@ export default function SurfacePanel({
   const esLanding = superficie !== undefined && rutaActiva === superficie.landing;
 
   return (
-    <div className="min-w-0 flex-1">
+    <div className="min-w-0 flex-1 bg-slate-900/60">
       <div className="mx-auto flex max-w-5xl flex-col gap-6 p-4 md:p-6">
         <FavoritesBar permisos={permisos} />
 
@@ -79,7 +79,7 @@ export default function SurfacePanel({
                   {grupo.grupo && (
                     <h2
                       id={id}
-                      className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                      className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-400"
                     >
                       {grupo.grupo}
                     </h2>
@@ -112,10 +112,10 @@ export default function SurfacePanel({
                             aria-current={esActivo ? "page" : undefined}
                             className={[
                               "block rounded border px-3 py-2 text-sm",
-                              "focus-visible:outline-2 focus-visible:outline-slate-900",
+                              "focus-visible:outline-2 focus-visible:outline-emerald-500 transition-all",
                               esActivo
-                                ? "border-slate-900 bg-white font-semibold"
-                                : "border-slate-200 bg-white hover:border-slate-400",
+                                ? "border-emerald-500/40 bg-emerald-500/15 font-semibold text-emerald-300"
+                                : "border-slate-800 bg-slate-950/80 text-slate-200 hover:border-slate-700 hover:bg-slate-900",
                             ].join(" ")}
                           >
                             {destino.etiqueta}

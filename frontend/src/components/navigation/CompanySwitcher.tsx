@@ -97,6 +97,7 @@ export default function CompanySwitcher({
         aria-expanded={abierto}
         title={unica ? "Solo tiene acceso a esta empresa" : "Cambiar de empresa"}
         className={[
+                      "text-xs",
           "flex w-full items-center gap-2 rounded px-3 py-1.5 text-sm",
           "hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-slate-900",
           unica ? "cursor-default" : "",
@@ -134,6 +135,7 @@ export default function CompanySwitcher({
                 onClick={() => void elegir(e)}
                 onKeyDown={alTeclado}
                 className={[
+                      "text-xs",
                   "cursor-pointer px-3 py-2 text-sm hover:bg-slate-50",
                   i === indice ? "bg-slate-100" : "",
                 ].join(" ")}

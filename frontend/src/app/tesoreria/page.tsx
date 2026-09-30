@@ -22,8 +22,8 @@
 export default function TesoreriaPage() {
   return (
     <section className="space-y-2">
-      <h1 className="text-2xl font-bold text-slate-900">Tesorería</h1>
-      <p className="text-sm text-slate-600">
+      <h1 className="text-2xl font-bold text-white">Tesorería</h1>
+      <p className="text-sm text-slate-400">
         Cobros y pagos, Efectos, anticipos, cesiones, conciliación, previsión de
         tesorería y flujo de efectivo del ejercicio activo.
       </p>

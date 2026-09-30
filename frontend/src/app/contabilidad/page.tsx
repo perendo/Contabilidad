@@ -20,8 +20,8 @@
 export default function ContabilidadPage() {
   return (
     <section className="space-y-2">
-      <h1 className="text-2xl font-bold text-slate-900">Contabilidad</h1>
-      <p className="text-sm text-slate-600">El libro diario del ejercicio activo, con su último apunte y el acceso directo a todo lo que se asienta aquí.</p>
+      <h1 className="text-2xl font-bold text-white">Contabilidad</h1>
+      <p className="text-sm text-slate-400">El libro diario del ejercicio activo, con su último apunte y el acceso directo a todo lo que se asienta aquí.</p>
     </section>
   );
 }
