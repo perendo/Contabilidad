@@ -3,7 +3,8 @@
 /**
  * SELECTOR DE EMPRESA (SPEC-031, US1)
  *
- * Desplegable con letra negra sobre fondo blanco para máxima legibilidad.
+ * Alto contraste: botón de fondo blanco con texto negro, y desplegable con
+ * fondo blanco, texto negro y selección en azul con texto blanco.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -86,8 +87,8 @@ export default function CompanySwitcher({
         aria-expanded={abierto}
         title={unica ? "Solo tiene acceso a esta empresa" : "Cambiar de empresa"}
         className={[
-          "flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 px-3 py-1.5 rounded-lg text-xs text-slate-200 transition-colors",
-          unica ? "cursor-default" : "hover:bg-slate-800 hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-emerald-500",
+          "flex items-center gap-2 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-900 shadow-sm transition-all",
+          unica ? "cursor-default opacity-90" : "hover:bg-slate-50 hover:border-slate-400 focus-visible:outline-2 focus-visible:outline-blue-600",
           compacto ? "w-full justify-between" : "",
         ].join(" ")}
       >
@@ -96,10 +97,10 @@ export default function CompanySwitcher({
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-3.5 h-3.5 text-indigo-400 shrink-0"
+          className="w-4 h-4 text-blue-600 shrink-0"
         >
           <path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" />
           <path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" />
@@ -110,7 +111,7 @@ export default function CompanySwitcher({
           <path d="M10 18h4" />
         </svg>
 
-        <span className="truncate font-medium max-w-[14rem]">
+        <span className="truncate max-w-[14rem] text-slate-900 font-bold">
           {cargando && !empresa ? "Cargando…" : (empresa?.nombre ?? "Sin empresa")}
         </span>
 
@@ -118,20 +119,20 @@ export default function CompanySwitcher({
           <svg
             aria-hidden="true"
             viewBox="0 0 10 6"
-            className="h-1.5 w-2 shrink-0 text-slate-400 ml-1"
+            className="h-1.5 w-2 shrink-0 text-slate-600 ml-1"
           >
             <path d="M0 0h10L5 6z" fill="currentColor" />
           </svg>
         )}
       </button>
 
-      {/* Desplegable: Fondo blanco con texto negro y selección destacada en fondo gris claro con borde/letra negra */}
+      {/* Desplegable con alto contraste: fondo blanco, texto negro, y seleccionado en azul con texto blanco */}
       {abierto && !unica && (
         <ul
           role="listbox"
           aria-label="Empresa activa"
           tabIndex={-1}
-          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-72 overflow-auto rounded-xl border border-slate-300 bg-white p-1.5 shadow-2xl text-slate-900"
+          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-80 overflow-auto rounded-xl border border-slate-300 bg-white p-1.5 shadow-2xl"
         >
           {empresas.map((e, i) => {
             const esActiva = e.company_id === empresa?.id;
@@ -145,15 +146,22 @@ export default function CompanySwitcher({
                 className={[
                   "cursor-pointer px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between",
                   esActiva
-                    ? "bg-slate-100 font-bold text-black border border-slate-400 shadow-sm"
+                    ? "bg-blue-600 text-white font-bold shadow-sm"
                     : i === indice
-                    ? "bg-slate-50 text-slate-900"
-                    : "text-slate-800 hover:bg-slate-100 hover:text-black",
+                    ? "bg-slate-100 text-slate-900 font-medium"
+                    : "text-slate-900 hover:bg-slate-100 font-medium",
                 ].join(" ")}
               >
                 <span className="truncate">{e.razon_social}</span>
                 {e.nif && (
-                  <span className="ml-2 text-[10px] font-mono text-slate-500 shrink-0 font-medium">{e.nif}</span>
+                  <span
+                    className={[
+                      "ml-2 text-[10px] font-mono shrink-0",
+                      esActiva ? "text-blue-100 font-semibold" : "text-slate-500",
+                    ].join(" ")}
+                  >
+                    {e.nif}
+                  </span>
                 )}
               </li>
             );

@@ -6,4 +6,21 @@
   body {
     @apply bg-slate-900 text-slate-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-300;
   }
+
+  /* Alto contraste para inputs, selects y textareas */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]),
+  select,
+  textarea {
+    @apply bg-white text-slate-900 border border-slate-300 shadow-sm placeholder:text-slate-400 focus:bg-white focus:text-black focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 focus:outline-none;
+  }
+
+  /* Opciones dentro de los selects nativos */
+  select option {
+    @apply bg-white text-slate-900 py-1;
+  }
+
+  select option:checked,
+  select option:hover {
+    @apply bg-blue-600 text-white font-semibold;
+  }
 }

@@ -3,8 +3,8 @@
 /**
  * MENU DE SESION (SPEC-031, US1, T085-T087)
  *
- * Desplegable con letra negra sobre fondo blanco para máxima legibilidad.
- * Importa correctamente `setEjercicioActivo` desde `./ejercicio`.
+ * Alto contraste: botón de fondo blanco con texto negro, y menú desplegable con
+ * fondo blanco, texto negro y opciones activas en azul con texto blanco.
  */
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -49,9 +49,6 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
     boton.current?.focus();
   };
 
-  /**
-   * Cierre de sesión. `setEjercicioActivo` se importa de `./ejercicio`.
-   */
   const salir = () => {
     try {
       setEjercicioActivo(null);
@@ -94,38 +91,38 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
         aria-expanded={abierto}
         aria-controls={abierto ? panelId : undefined}
         title={`${usuario.email}${usuario.rol ? ` · ${usuario.rol}` : ""}`}
-        className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-slate-800 hover:border-slate-600 focus-visible:outline-2 focus-visible:outline-emerald-500 transition-colors"
+        className="flex items-center gap-2 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50 hover:border-slate-400 focus-visible:outline-2 focus-visible:outline-blue-600 transition-all"
       >
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="w-3.5 h-3.5 text-slate-400 shrink-0"
+          className="w-4 h-4 text-slate-700 shrink-0"
         >
           <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
           <circle cx="12" cy="7" r="4" />
         </svg>
 
-        <span className="font-mono text-[11px] truncate max-w-[12rem] text-slate-300">
+        <span className="font-mono text-xs font-bold truncate max-w-[12rem] text-slate-900">
           {usuario.email || usuario.nombre}
         </span>
 
         {usuario.rol && (
-          <span className="text-[10px] px-1 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-bold border border-slate-300">
             {usuario.rol}
           </span>
         )}
 
-        <svg aria-hidden="true" viewBox="0 0 10 6" className="h-1.5 w-2 shrink-0 text-slate-400 ml-1">
+        <svg aria-hidden="true" viewBox="0 0 10 6" className="h-1.5 w-2 shrink-0 text-slate-600 ml-1">
           <path d="M0 0h10L5 6z" fill="currentColor" />
         </svg>
       </button>
 
-      {/* Desplegable: Fondo blanco con texto negro para máxima legibilidad */}
+      {/* Desplegable con alto contraste: fondo blanco, texto negro, y selección azul con texto blanco */}
       {abierto && (
         <div
           id={panelId}
@@ -136,7 +133,7 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
           <div className="border-b border-slate-200 px-3 py-2">
             <p className="truncate text-xs font-bold text-black">{usuario.nombre}</p>
             <p className="truncate font-mono text-[11px] text-slate-600">{usuario.email}</p>
-            {usuario.rol && <p className="text-[11px] text-slate-500 mt-0.5 font-medium">Rol: {usuario.rol}</p>}
+            {usuario.rol && <p className="text-[11px] text-slate-700 mt-0.5 font-semibold">Rol: {usuario.rol}</p>}
           </div>
 
           <button
@@ -144,7 +141,7 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
             role="menuitem"
             aria-expanded={seccion === "empresa"}
             onClick={() => setSeccion(seccion === "empresa" ? null : "empresa")}
-            className="mt-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-800 hover:bg-slate-100 hover:text-black focus-visible:outline-2 focus-visible:outline-emerald-500"
+            className="mt-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
           >
             <span>Cambiar de empresa</span>
             <span className="text-[11px] text-slate-500 font-normal">
@@ -153,7 +150,7 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
           </button>
 
           {seccion === "empresa" && (
-            <ul role="menu" aria-label="Empresa activa" className="mb-1 ml-2 border-l-2 border-slate-200 pl-2 space-y-1">
+            <ul role="menu" aria-label="Empresa activa" className="mb-1 ml-2 border-l-2 border-slate-300 pl-2 space-y-1">
               {empresas.map((e) => {
                 const activa = e.company_id === contexto.empresa.id;
                 return (
@@ -167,14 +164,23 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
                         if (!activa) await cambiarEmpresa(e.company_id);
                       }}
                       className={[
-                        "flex w-full items-baseline justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
+                        "flex w-full items-baseline justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors font-medium",
                         activa
-                          ? "bg-slate-100 font-bold text-black border border-slate-400 shadow-sm"
-                          : "text-slate-800 hover:bg-slate-100 hover:text-black",
+                          ? "bg-blue-600 text-white font-bold shadow-sm"
+                          : "text-slate-900 hover:bg-slate-100",
                       ].join(" ")}
                     >
-                      <span className={activa ? "font-bold text-black" : "font-normal"}>{e.razon_social}</span>
-                      {e.nif && <span className="shrink-0 font-mono text-[10px] text-slate-500">{e.nif}</span>}
+                      <span>{e.razon_social}</span>
+                      {e.nif && (
+                        <span
+                          className={[
+                            "shrink-0 font-mono text-[10px]",
+                            activa ? "text-blue-100 font-semibold" : "text-slate-500",
+                          ].join(" ")}
+                        >
+                          {e.nif}
+                        </span>
+                      )}
                     </button>
                   </li>
                 );
@@ -192,14 +198,14 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
             role="menuitem"
             aria-expanded={seccion === "ejercicio"}
             onClick={() => setSeccion(seccion === "ejercicio" ? null : "ejercicio")}
-            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-800 hover:bg-slate-100 hover:text-black focus-visible:outline-2 focus-visible:outline-emerald-500"
+            className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
           >
             <span>Cambiar de ejercicio</span>
             <span className="text-[11px] text-slate-500 font-normal">activo {contexto.ejercicio_activo.ejercicio}</span>
           </button>
 
           {seccion === "ejercicio" && (
-            <ul role="menu" aria-label="Ejercicio activo" className="mb-1 ml-2 border-l-2 border-slate-200 pl-2 space-y-1">
+            <ul role="menu" aria-label="Ejercicio activo" className="mb-1 ml-2 border-l-2 border-slate-300 pl-2 space-y-1">
               {ejercicios.map((e) => {
                 const texto = etiqueta(e.estado, e.es_actual);
                 const activo = e.ejercicio === contexto.ejercicio_activo.ejercicio;
@@ -217,19 +223,37 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
                         if (!activo) await cambiarEjercicio(e.ejercicio);
                       }}
                       className={[
-                        "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors",
+                        "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors font-medium",
                         !e.es_seleccionable
-                          ? "cursor-not-allowed opacity-50"
+                          ? "cursor-not-allowed opacity-50 text-slate-400"
                           : activo
-                          ? "bg-slate-100 font-bold text-black border border-slate-400 shadow-sm"
-                          : "text-slate-800 hover:bg-slate-100 hover:text-black",
+                          ? "bg-blue-600 text-white font-bold shadow-sm"
+                          : "text-slate-900 hover:bg-slate-100",
                       ].join(" ")}
                     >
-                      <span className={clase(e)}>
+                      <span className={activo ? "text-white font-bold" : clase(e)}>
                         {e.ejercicio}
-                        {texto && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800 font-normal">{texto}</span>}
+                        {texto && (
+                          <span
+                            className={[
+                              "ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                              activo
+                                ? "bg-blue-800 text-white border border-blue-400"
+                                : "bg-amber-100 text-amber-900 border border-amber-300",
+                            ].join(" ")}
+                          >
+                            {texto}
+                          </span>
+                        )}
                       </span>
-                      <span className="font-mono text-[11px] text-slate-500 font-medium">{e.n_asientos}</span>
+                      <span
+                        className={[
+                          "font-mono text-[11px]",
+                          activo ? "text-blue-100 font-semibold" : "text-slate-500",
+                        ].join(" ")}
+                      >
+                        {e.n_asientos}
+                      </span>
                     </button>
                   </li>
                 );
