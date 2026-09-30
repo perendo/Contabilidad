@@ -3,15 +3,7 @@
 /**
  * SELECTOR DE EMPRESA (SPEC-031, US1)
  *
- * Reutiliza el almacen y los tokens que ya tenia `components/rbac/CompanySwitch.tsx`,
- * que es quien sabe listar las empresas del usuario. No se reimplementa la lista:
- * se pide al mismo sitio, y por eso este componente no duplica esa logica.
- *
- * Lo que cambia respecto al selector viejo es que el cambio de empresa **recalcula
- * el ejercicio** (FR-004). Con dos almacenes independientes, cambiar de empresa
- * dejaba el ejercicio como estaba y el usuario veia una combinacion imposible.
- *
- * Accesibilidad: mismo contrato de teclado que `ExerciseSwitcher` (FR-030).
+ * Desplegable con letra negra sobre fondo blanco para máxima legibilidad.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -133,12 +125,13 @@ export default function CompanySwitcher({
         )}
       </button>
 
+      {/* Desplegable: Fondo blanco con texto negro y selección destacada en fondo gris claro con borde/letra negra */}
       {abierto && !unica && (
         <ul
           role="listbox"
           aria-label="Empresa activa"
           tabIndex={-1}
-          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-72 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-1.5 shadow-2xl"
+          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-72 overflow-auto rounded-xl border border-slate-300 bg-white p-1.5 shadow-2xl text-slate-900"
         >
           {empresas.map((e, i) => {
             const esActiva = e.company_id === empresa?.id;
@@ -152,15 +145,15 @@ export default function CompanySwitcher({
                 className={[
                   "cursor-pointer px-3 py-2 text-xs rounded-lg transition-colors flex items-center justify-between",
                   esActiva
-                    ? "bg-emerald-500/15 font-semibold text-emerald-300 border border-emerald-500/20"
+                    ? "bg-slate-100 font-bold text-black border border-slate-400 shadow-sm"
                     : i === indice
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-300 hover:bg-slate-900",
+                    ? "bg-slate-50 text-slate-900"
+                    : "text-slate-800 hover:bg-slate-100 hover:text-black",
                 ].join(" ")}
               >
                 <span className="truncate">{e.razon_social}</span>
                 {e.nif && (
-                  <span className="ml-2 text-[10px] font-mono text-slate-500 shrink-0">{e.nif}</span>
+                  <span className="ml-2 text-[10px] font-mono text-slate-500 shrink-0 font-medium">{e.nif}</span>
                 )}
               </li>
             );

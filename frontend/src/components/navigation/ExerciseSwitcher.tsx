@@ -3,22 +3,7 @@
 /**
  * SELECTOR DE EJERCICIO (SPEC-031, US1)
  *
- * Es el componente que justifica la feature. El caso es contabilizar en dos
- * ejercicios a la vez, y el riesgo es hacer el cambio equivocado sin darse cuenta.
- * Por eso aqui no basta con mostrar el ano:
- *
- * - El estado se distinge con **color Y con etiqueta de texto**. Un color solo
- *   deja fuera a quien no distingue rojo de verde, y ademas el estado del ejercicio
- *   es informacion critica, no decorativa (FR-031, research D7).
- * - Se ve **cuantos asientos lleva cada ejercicio**, que es lo que permite decidir *   en cual se esta sin abrir el diario (FR-017).
- * - El ejercicio anterior abierto se marca como `cerrando`, no como `abierto`: la
- *   diferencia importa y un usuario que cierra el ano no la va a leer sola.
- * - El cerrado **no** es seleccionable y se explica por que.
- *
- * Accesibilidad (FR-030, FR-031):
- * - Es un `listbox`, con `role`, `aria-activedescendant` y navegacion por flechas.
- * - `Enter` o `Espacio` seleccionan; `Escape` cierra sin cambiar.
- * - El foco es visible, y el estado no depende solo del color.
+ * Desplegable con letra negra sobre fondo blanco para máxima legibilidad.
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -26,10 +11,10 @@ import { useSesion } from "./SessionContext";
 import type { EjercicioResuelto } from "./tipos";
 
 const CLASES: Record<string, string> = {
-  abierto_actual: "text-slate-200",
-  abierto_anterior: "text-amber-400",
-  con_apertura: "text-slate-200",
-  cerrado: "text-slate-500 line-through",
+  abierto_actual: "text-slate-900 font-semibold",
+  abierto_anterior: "text-amber-800 font-medium",
+  con_apertura: "text-slate-900 font-medium",
+  cerrado: "text-slate-400 line-through",
 };
 
 export function etiqueta(estado: string, esActual: boolean): string | null {
@@ -41,7 +26,7 @@ export function etiqueta(estado: string, esActual: boolean): string | null {
 
 export function clase(ejercicio: EjercicioResuelto): string {
   const base = CLASES[ejercicio.estado] ?? CLASES.abierto_actual;
-  return `${base} ${ejercicio.es_actual ? "font-semibold" : ""}`;
+  return `${base} ${ejercicio.es_actual ? "font-bold text-black" : ""}`;
 }
 
 export default function ExerciseSwitcher({ compacto = false }: { compacto?: boolean }) {
@@ -193,13 +178,14 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
         </svg>
       </button>
 
+      {/* Desplegable: Fondo blanco con texto negro y selección destacada en fondo gris claro con borde/letra negra */}
       {abierto && (
         <ul
           id={listaId}
           role="listbox"
           aria-label="Ejercicio activo"
           tabIndex={-1}
-          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-80 overflow-auto rounded-xl border border-slate-800 bg-slate-950 p-1.5 shadow-2xl"
+          className="absolute left-0 top-full z-50 mt-1 max-h-60 w-80 overflow-auto rounded-xl border border-slate-300 bg-white p-1.5 shadow-2xl text-slate-900"
         >
           {ejercicios.map((e, i) => {
             const texto = etiqueta(e.estado, e.es_actual);
@@ -217,21 +203,21 @@ export default function ExerciseSwitcher({ compacto = false }: { compacto?: bool
                   "flex items-center justify-between px-3 py-2 text-xs rounded-lg transition-colors",
                   e.es_seleccionable ? "cursor-pointer" : "cursor-not-allowed opacity-50",
                   esActivo
-                    ? "bg-emerald-500/15 font-semibold text-emerald-300 border border-emerald-500/20"
+                    ? "bg-slate-100 font-bold text-black border border-slate-400 shadow-sm"
                     : i === activo && e.es_seleccionable
-                    ? "bg-slate-900 text-white"
-                    : "text-slate-300 hover:bg-slate-900",
+                    ? "bg-slate-50 text-slate-900"
+                    : "text-slate-800 hover:bg-slate-100 hover:text-black",
                 ].join(" ")}
               >
                 <span className={clase(e)}>
                   {e.ejercicio}
                   {texto && (
-                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">
+                    <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800 font-normal">
                       {texto}
                     </span>
                   )}
                 </span>
-                <span className="text-[11px] font-mono text-slate-500">{e.n_asientos} asientos</span>
+                <span className="text-[11px] font-mono text-slate-500 font-medium">{e.n_asientos} asientos</span>
               </li>
             );
           })}
