@@ -2846,3 +2846,24 @@ parser contra el. `Data/` esta ahora en `.gitignore`.
 - **Integridad de Contratos y Enlaces**:
   - No se ha alterado ninguna ruta, prop o contrato de enlace ni jerarquía de accesibilidad.
 
+
+## 52. Sesión de Mejoras UX/UI y Flujo Contable PGC (2026-09-30)
+
+Resumen de intervenciones implementadas y verificadas:
+
+1. **Corrección de import `setEjercicioActivo` y consistencia de sesión**:
+   - `frontend/src/components/navigation/SessionMenu.tsx`: Corregido el import de `setEjercicioActivo` desde `./ejercicio` para garantizar persistencia del ejercicio contable seleccionado en la sesión activa.
+
+2. **Diseño de Alto Contraste en Controles de Formulario**:
+   - `frontend/src/app/globals.css`: Reglas de alto contraste aplicadas a `input`, `select`, `textarea` con `bg-white`, `text-slate-900` y `select option:checked` en `bg-blue-600 text-white`.
+   - `CompanySwitcher.tsx`, `ExerciseSwitcher.tsx`, `SessionMenu.tsx`: Botones disparadores con fondo blanco y texto oscuro visible, con listas desplegables legibles y selección activa en azul con texto blanco brillante.
+
+3. **Navegabilidad y Enlaces a `/cuentas/nueva`**:
+   - `frontend/src/app/contabilidad/page.tsx`: Inclusión del botón visible `Crear Nueva Cuenta / Subcuenta` hacia `/cuentas/nueva`.
+   - `frontend/src/app/cuentas/page.tsx`: Inclusión del botón superior `+ Nueva Cuenta / Subcuenta`.
+   - `frontend/src/app/cuentas/nueva/page.tsx`: Soporte para precarga de código mediante query param `?code=...`.
+
+4. **Consulta y Alta de Cuentas desde el Diario Contable (`AccountAutocomplete` + `JournalEntryForm`)**:
+   - **Validación instantánea**: El usuario puede teclear código numérico o fragmento de denominación y el sistema valida contra las cuentas apuntables (`is_selectable = true`) de la empresa activa.
+   - **Consulta PGC por doble clic**: Al hacer doble clic en el campo de la cuenta en cualquier línea del asiento (o pulsar la flecha desplegable), se listan las cuentas PGC apuntables activas disponibles.
+   - **Desvío al Alta si no existe**: Si el código o búsqueda no coincide con ninguna cuenta en el PGC, el componente despliega un aviso con botón directo `+ Alta en PGC`, redirigiendo a `/cuentas/nueva?code=<codigo>` con el código precargado para su creación inmediata.

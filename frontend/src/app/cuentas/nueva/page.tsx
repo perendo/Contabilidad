@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { crearCuenta, sugerirCuentas, type CuentaSugerida } from "@/services/acct/api";
 import { AccountAutocomplete } from "@/components/acct/AccountAutocomplete";
 
@@ -11,11 +12,15 @@ export interface CuentaFormData {
 }
 
 export default function NuevaCuentaPage() {
+  const searchParams = useSearchParams();
+  const initialCode = searchParams ? searchParams.get("code") || "" : "";
+
   const [formData, setFormData] = useState<CuentaFormData>({
-    code: "",
+    code: initialCode,
     name: "",
     parent_id: null,
   });
+
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exito, setExito] = useState(false);
@@ -50,8 +55,8 @@ export default function NuevaCuentaPage() {
     debouncePadre.current = setTimeout(async () => {
       try {
         const data = await sugerirCuentas(query, 20);
-        // Filtrar solo cuentas que NO son hojas (nivel < 4) para poder ser padres
-        setSugerenciasPadre(data.items.filter(c => c.level < 4));
+        // Filtrar solo cuentas que NO son hojas (nivel < 4) para poder ser madres
+        setSugerenciasPadre(data.items.filter((c) => c.level < 4));
       } catch {
         setSugerenciasPadre([]);
       }
@@ -63,7 +68,6 @@ export default function NuevaCuentaPage() {
     setError(null);
     setExito(false);
     setCargando(true);
-
     try {
       await crearCuenta({
         code: formData.code,
@@ -80,57 +84,80 @@ export default function NuevaCuentaPage() {
   };
 
   // Calcular nivel esperado basado en el código
-  const nivelEsperado = formData.code.length <= 4 ? formData.code.length : 
-                       (formData.code.length >= 5 && formData.code.length <= 8 ? 5 : 0);
+  const nivelEsperado =
+    formData.code.length <= 4
+      ? formData.code.length
+      : formData.code.length >= 5 && formData.code.length <= 8
+      ? 5
+      : 0;
 
   return (
-    <div className="p-4 max-w-2xl">
-      <h1 className="text-2xl font-bold mb-4">Nueva Cuenta / Subcuenta</h1>
+    <div className="p-6 max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-emerald-400">
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+          Nueva Cuenta / Subcuenta PGC
+        </h1>
+        <p className="text-xs text-slate-400 mt-1">
+          Alta de cuentas y subcuentas apuntables (ej. Grupo 17, 40, 41, 43, 57) según el Plan General Contable.
+        </p>
+      </div>
 
       {exito && (
-        <div className="mb-4 p-3 bg-green-100 text-green-800 rounded">
-          Cuenta creada correctamente
+        <div className="p-4 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl font-medium text-sm flex items-center gap-2">
+          <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-emerald-700 shrink-0">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+          </svg>
+          <span>Cuenta creada correctamente en el Plan General Contable. Ya está disponible para asentar.</span>
         </div>
       )}
 
       {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-800 rounded">
-          {error}
+        <div className="p-4 bg-rose-100 text-rose-900 border border-rose-300 rounded-xl font-medium text-sm flex items-center gap-2">
+          <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-rose-700 shrink-0">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
+          </svg>
+          <span>{error}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow border">
+      <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-xl shadow-lg border border-slate-300 text-slate-900">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Código *
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Código Contable *
           </label>
           <input
             type="text"
             value={formData.code}
             onChange={handleCodeChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ej: 43000001"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-600"
+            placeholder="Ej: 17000001, 17300001, 40000010..."
             maxLength={8}
             required
             pattern="[0-9]+"
             disabled={cargando}
           />
-          <p className="mt-1 text-sm text-gray-500">
-            Solo dígitos. Nivel 1-4: longitud = nivel. Nivel 5: 5-8 dígitos.
-            {nivelEsperado > 0 && <span className="ml-2">Nivel estimado: {nivelEsperado}</span>}
+          <p className="mt-1 text-xs text-slate-500">
+            Solo dígitos. Nivel 1-4: longitud = nivel (ej. 4 dígitos para subcuentas). Nivel 5: 5-8 dígitos.
+            {nivelEsperado > 0 && (
+              <span className="ml-2 font-bold text-blue-700">Nivel estimado: {nivelEsperado} ({nivelEsperado >= 4 ? "Apuntable" : "Cuenta de Grupo"})</span>
+            )}
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nombre *
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Nombre / Razón Social *
           </label>
           <input
             type="text"
             value={formData.name}
             onChange={handleNameChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Ej: Cliente Acme S.L."
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-600"
+            placeholder="Ej: Banco Santander L/P, Proveedor Maquinaria S.L..."
             maxLength={200}
             required
             disabled={cargando}
@@ -138,43 +165,40 @@ export default function NuevaCuentaPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Cuenta Padre (opcional)
+          <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+            Cuenta Padre (Opcional)
           </label>
           <AccountAutocomplete
             value={formData.parent_id ? `${formData.parent_id}` : ""}
             onChange={handlePadreSeleccionado}
             onSearch={handleBuscarPadre}
             sugerencias={sugerenciasPadre}
-            placeholder="Buscar cuenta padre (solo niveles 1-3)..."
+            placeholder="Buscar cuenta madre (ej: 170, 173, 400)..."
             disabled={cargando}
           />
-          <p className="mt-1 text-sm text-gray-500">
-            Solo cuentas de nivel 1-3 (grupos, subgrupos, cuentas). Las subcuentas (nivel 4) no pueden tener hijas.
-            {formData.parent_id && <span className="text-blue-600 ml-2">Padre seleccionado</span>}
+          <p className="mt-1 text-xs text-slate-500">
+            Niveles 1 a 3 (grupos, subgrupos, cuentas de 3 dígitos).
+            {formData.parent_id && <span className="text-emerald-700 font-bold ml-2">✓ Madre seleccionada</span>}
           </p>
         </div>
 
-        <div className="pt-4 border-t">
+        <div className="pt-4 border-t border-slate-200">
           <button
             type="submit"
             disabled={cargando}
-            className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 px-4 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {cargando ? "Creando..." : "Crear Cuenta"}
+            {cargando ? "Guardando en PGC..." : "Dar de Alta en PGC"}
           </button>
         </div>
       </form>
 
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <h3 className="font-medium mb-2">Reglas del Plan de Cuentas</h3>
-        <ul className="text-sm text-gray-600 space-y-1">
-          <li>• Código único por empresa (máx. 8 dígitos)</li>
-          <li>• Nivel = longitud del código (1-4 dígitos) o nivel 5 (5-8 dígitos)</li>
-          <li>• Profundidad máxima: 5 niveles</li>
-          <li>• Solo hojas nivel ≥ 4 son apuntables (is_selectable)</li>
-          <li>• Al crear una hija, la madre deja de ser apuntable</li>
-          <li>• Cuentas con asientos no se pueden desactivar</li>
+      <div className="p-4 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 space-y-2">
+        <h3 className="font-semibold text-xs text-white uppercase tracking-wider">Reglas del Plan General Contable</h3>
+        <ul className="text-xs text-slate-400 space-y-1">
+          <li>• Código numérico único por empresa activa (máx. 8 dígitos).</li>
+          <li>• <strong>Apuntabilidad</strong>: Solo las subcuentas de nivel ≥ 4 (4 a 8 dígitos) admiten asientos contables en el diario.</li>
+          <li>• Al crear una subcuenta hija bajo una cuenta, la cuenta madre queda como cuenta sumatoria/agrupadora.</li>
         </ul>
       </div>
     </div>

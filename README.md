@@ -647,3 +647,18 @@ El frontend cuenta con un diseño unificado y moderno de alto contraste acorde a
 - **Rail lateral permanente**: 6 superficies estables (Contabilidad, Facturación, Tesorería, Informes, Fiscal, Maestros).
 - **Zona de contexto**: Empresa activa, ejercicio fiscal (con guards de estado) y menú de sesión.
 - **Resúmenes en tiempo real**: Indicadores contables y de liquidez por ejercicio.
+
+## Actualizaciones de Sesión (2026-09-30)
+
+### 1. Alto Contraste y Accesibilidad Visual (UI)
+- **Inputs, fechas y áreas de texto**: Fondo blanco puro (`bg-white`), texto negro contrastado (`text-slate-900`) y bordes nítidos. Al escribir/enfocar (`focus`), se garantiza legibilidad completa con marco azul y fondo blanco.
+- **Selectores y menús desplegables (`<select>`, `CompanySwitcher`, `ExerciseSwitcher`, `SessionMenu`)**: Botones con fondo blanco y tipografía negra destacada. Opciones desplegadas con fondo blanco y elemento activo/seleccionado en **azul (`bg-blue-600`) con texto en blanco**.
+
+### 2. Gestión Directa de Cuentas y Subcuentas PGC
+- **Accesos visibles a `/cuentas/nueva`**: Botón destacado **`Crear Nueva Cuenta / Subcuenta`** en la landing de Contabilidad y botón **`+ Nueva Cuenta / Subcuenta`** en la cabecera del Plan General Contable (`/cuentas`).
+- **Soporte para Grupo 17 y subcuentas a largo plazo**: Creación validada de deudas con entidades de crédito (`170`, `1700`, `17000001`) y proveedores de inmovilizado/acreedores a largo plazo (`173`, `1730`, `17300001`), con vinculación a cuenta madre y control de apuntabilidad (nivel $\ge 4$).
+
+### 3. Asistente y Autocompletado del PGC en el Libro Diario (`JournalEntryForm` / `AccountAutocomplete`)
+- **Validación al teclear**: Búsqueda en tiempo real de cuentas contables por prefijo de código o texto del nombre.
+- **Consulta del PGC por doble clic**: Hacer doble clic o pulsar la flecha desplegable abre inmediatamente la lista de cuentas apuntables del Plan General Contable de la empresa activa.
+- **Redirección automática al Alta si no existe**: Si la cuenta tecleada no existe en el PGC, el desplegable informa de la ausencia y ofrece un botón directo **`+ Alta en PGC`**, que precarga el código en `/cuentas/nueva` para darla de alta al instante sin perder el contexto.
