@@ -6,6 +6,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.acct.account_plan import AccountPlan
+from models.acct.journal import JournalEntryLine
 from services.audit.writer import audit_escribir
 
 
@@ -224,6 +225,22 @@ async def actualizar_cuenta(
         cuenta.name = name
 
     if is_active is not None and is_active != cuenta.is_active:
+        if is_active is False:
+            # Valida en el punto mas cercano a la persistencia lo que el trigger
+            # trg_account_plan_protected_update rechazaria en el flush: sin esta
+            # comprobacion el cliente recibia un IntegrityError (500/422) en vez
+            # de account_has_entries (409).
+            con_apuntes = await db.scalar(
+                select(JournalEntryLine.id).where(
+                    JournalEntryLine.empresa_id == tenant_id,
+                    JournalEntryLine.account_id == account_id,
+                )
+            )
+            if con_apuntes is not None:
+                raise AccountError(
+                    "no se puede desactivar una cuenta con asientos asociados",
+                    "account_has_entries",
+                )
         payload["is_active_anterior"] = cuenta.is_active
         payload["is_active_nuevo"] = is_active
         cuenta.is_active = is_active

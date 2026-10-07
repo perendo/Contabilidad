@@ -137,11 +137,16 @@ async def actualizar(
     except AccountError as e:
         if e.code == "not_found":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-        if e.code == "name_duplicate":
+        if e.code in ("name_duplicate", "account_has_entries"):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except (IntegrityError, DBAPIError) as db_exc:
         msg = str(db_exc.orig if hasattr(db_exc, "orig") and db_exc.orig else db_exc)
+        if "no se puede desactivar" in msg:
+            limpio = msg.split("account_plan:")[-1].split("\n")[0].strip()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail=limpio
+            )
         if "account_plan:" in msg:
             limpio = msg.split("account_plan:")[-1].split("\n")[0].strip()
             raise HTTPException(

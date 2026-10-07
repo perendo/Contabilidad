@@ -6,23 +6,18 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
+from conftest import crear_empresa
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.acct.journal import JournalEntryLine
 from models.ar.vencimiento import EstadoVencimiento, TipoVencimiento, Vencimiento
-from models.iam.company import Company
 from services.treasury.cobros_pagos import registrar_pago
 from services.treasury.cuentas_bancarias import (
     CuentaBancariaError,
     crear_cuenta_bancaria,
     listar_cuentas_bancarias,
 )
-
-
-async def _empresa(db: AsyncSession, cid: int = 20) -> None:
-    db.add(Company(company_id=cid, nif=f"B{cid:08d}", razon_social=f"Empresa MultiBanco {cid} SL"))
-    await db.flush()
 
 
 async def _vencimiento(
@@ -46,7 +41,7 @@ async def _vencimiento(
 
 
 async def test_crear_multiples_cuentas_bancarias(db_session: AsyncSession) -> None:
-    await _empresa(db_session, 20)
+    await crear_empresa(db_session, 20)
 
     # Crear Banco A (Santander)
     cb_a = await crear_cuenta_bancaria(
@@ -93,7 +88,7 @@ async def test_crear_multiples_cuentas_bancarias(db_session: AsyncSession) -> No
 
 
 async def test_asiento_tesoreria_con_cuenta_bancaria_origen(db_session: AsyncSession) -> None:
-    await _empresa(db_session, 20)
+    await crear_empresa(db_session, 20)
 
     # Crear cuenta bancaria específica
     cb = await crear_cuenta_bancaria(
