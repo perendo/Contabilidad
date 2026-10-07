@@ -21,9 +21,24 @@ interface Diario {
   items: ItemDiario[];
 }
 
+/**
+ * Filtro de estado. Por defecto (opción vacía) el backend devuelve
+ * POSTED+CANCELLED, que es el contrato histórico del libro: el borrador no forma
+ * parte de él. Las opciones se envían como `?estado=`, y un valor desconocido
+ * contesta 422 `estado_desconocido` en vez de devolver cero filas en silencio.
+ */
+const OPCIONES_ESTADO = [
+  { valor: "", etiqueta: "Publicados y anulados" },
+  { valor: "DRAFT", etiqueta: "Borradores" },
+  { valor: "POSTED", etiqueta: "Publicados" },
+  { valor: "CANCELLED", etiqueta: "Anulados" },
+  { valor: "DRAFT,POSTED,CANCELLED", etiqueta: "Todos" },
+];
+
 export default function DiarioPage() {
   const [desde, setDesde] = useState("2026-01-01");
   const [hasta, setHasta] = useState("2026-12-31");
+  const [estado, setEstado] = useState("");
   const [diario, setDiario] = useState<Diario | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -34,6 +49,7 @@ export default function DiarioPage() {
     setCargando(true);
     try {
       const params = new URLSearchParams({ date_from: desde, date_to: hasta });
+      if (estado) params.set("estado", estado);
       setDiario(await get<Diario>(`/api/v1/journal/entries?${params}`));
     } catch (e) {
       if (e instanceof ApiError) setError(e.message);
@@ -46,7 +62,7 @@ export default function DiarioPage() {
   return (
     <main className="p-6 max-w-5xl mx-auto">
       <h1 className="text-xl font-semibold mb-4">Libro diario</h1>
-      <form onSubmit={consultar} className="flex gap-3 mb-4 items-end">
+      <form onSubmit={consultar} className="flex gap-3 mb-4 items-end flex-wrap">
         <label className="flex flex-col gap-1">
           Desde
           <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="border rounded px-3 py-1" />
@@ -54,6 +70,20 @@ export default function DiarioPage() {
         <label className="flex flex-col gap-1">
           Hasta
           <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="border rounded px-3 py-1" />
+        </label>
+        <label className="flex flex-col gap-1">
+          Estado
+          <select
+            value={estado}
+            onChange={(e) => setEstado(e.target.value)}
+            className="border rounded px-3 py-1 bg-white text-slate-900"
+          >
+            {OPCIONES_ESTADO.map((o) => (
+              <option key={o.valor} value={o.valor}>
+                {o.etiqueta}
+              </option>
+            ))}
+          </select>
         </label>
         <button type="submit" disabled={cargando} className="bg-blue-600 text-white rounded px-3 py-1 disabled:opacity-50">
           {cargando ? "Consultando…" : "Consultar"}

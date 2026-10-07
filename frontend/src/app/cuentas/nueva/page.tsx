@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { crearCuenta, obtenerArbolCuentas, type CuentaNodo } from "@/services/acct/api";
 
@@ -25,7 +25,9 @@ function aplanarCuentas(nodos: CuentaNodo[]): CuentaNodo[] {
   return resultado;
 }
 
-export default function NuevaCuentaPage() {
+// useSearchParams obliga a un limite Suspense en la prerenderizacion: sin el, `next build`
+// se para con "missing-suspense-with-csr-bailout". El wrapper de abajo es ese limite.
+function NuevaCuentaForm() {
   const searchParams = useSearchParams();
   const initialCode = searchParams ? searchParams.get("code") || "" : "";
 
@@ -278,5 +280,15 @@ export default function NuevaCuentaPage() {
         </ul>
       </div>
     </div>
+  );
+}
+
+export default function NuevaCuentaPage() {
+  return (
+    <Suspense
+      fallback={<div className="p-6 text-sm text-slate-400">Cargando el formulario…</div>}
+    >
+      <NuevaCuentaForm />
+    </Suspense>
   );
 }

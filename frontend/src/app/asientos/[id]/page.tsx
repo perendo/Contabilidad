@@ -54,6 +54,18 @@ export default function DetalleAsientoPage() {
     }
   }
 
+  async function asentar() {
+    if (!window.confirm("¿Asentar este asiento en el libro diario?")) return;
+    setError(null);
+    try {
+      await post(`/api/v1/journal/entries/${params.id}/post`, {});
+      await cargar();
+    } catch (e) {
+      if (e instanceof ApiError) setError(e.message);
+      else setError("Error de conexión");
+    }
+  }
+
   return (
     <main className="p-6 max-w-5xl mx-auto">
       <h1 className="text-xl font-semibold mb-4">Asiento</h1>
@@ -67,6 +79,14 @@ export default function DetalleAsientoPage() {
               {detalle.estado}
             </span>
           </p>
+          {detalle.estado === "DRAFT" && (
+            <button
+              onClick={asentar}
+              className="bg-blue-600 text-white rounded px-3 py-1 mb-4"
+            >
+              Asentar en el libro diario
+            </button>
+          )}
           {detalle.estado === "POSTED" && (
             <button onClick={anular} className="bg-red-600 text-white rounded px-3 py-1 mb-4">
               Anular con rectificativo

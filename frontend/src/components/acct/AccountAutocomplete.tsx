@@ -45,6 +45,9 @@ export function AccountAutocomplete({
   const [indiceSeleccionado, setIndiceSeleccionado] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const listaRef = useRef<HTMLUListElement>(null);
+  // El panel de "no encontrada" es un <div>, no un <ul>: como un ref no admite dos
+  // tipos de elemento, cada contenedor lleva el suyo y handleClickOutside mira los tres.
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Actualizar query cuando cambia value (cuando se selecciona o carga una cuenta)
   useEffect(() => {
@@ -113,11 +116,16 @@ export function AccountAutocomplete({
   };
 
   const handleClickOutside = useCallback((e: MouseEvent) => {
-    if (inputRef.current && !inputRef.current.contains(e.target as Node)) {
-      if (listaRef.current && !listaRef.current.contains(e.target as Node)) {
-        setAbierto(false);
-        setIndiceSeleccionado(-1);
-      }
+    const fuera = (ref: { current: Node | null }) =>
+      ref.current && !ref.current.contains(e.target as Node);
+    if (
+      inputRef.current &&
+      !inputRef.current.contains(e.target as Node) &&
+      fuera(listaRef) &&
+      fuera(panelRef)
+    ) {
+      setAbierto(false);
+      setIndiceSeleccionado(-1);
     }
   }, []);
 
@@ -231,7 +239,7 @@ export function AccountAutocomplete({
       {/* Si no existe la cuenta o no se encuentran cuentas con la búsqueda */}
       {abierto && sugerencias.length === 0 && (
         <div
-          ref={listaRef as any}
+          ref={panelRef}
           className="absolute z-50 w-full mt-1 bg-white border border-slate-300 rounded-xl shadow-2xl p-3.5 text-xs text-slate-700 space-y-2"
         >
           <div className="flex items-center gap-1.5 text-amber-700 font-semibold">

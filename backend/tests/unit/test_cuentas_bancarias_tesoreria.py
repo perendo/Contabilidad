@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 from decimal import Decimal
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,8 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models.acct.journal import JournalEntryLine
 from models.ar.vencimiento import EstadoVencimiento, TipoVencimiento, Vencimiento
 from models.iam.company import Company
-from models.treasury.cuenta_bancaria import CuentaBancaria
-from services.treasury.cobros_pagos import registrar_cobro, registrar_pago
+from services.treasury.cobros_pagos import registrar_pago
 from services.treasury.cuentas_bancarias import (
     CuentaBancariaError,
     crear_cuenta_bancaria,

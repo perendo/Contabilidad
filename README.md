@@ -658,7 +658,41 @@ El frontend cuenta con un diseño unificado y moderno de alto contraste acorde a
 - **Accesos visibles a `/cuentas/nueva`**: Botón destacado **`Crear Nueva Cuenta / Subcuenta`** en la landing de Contabilidad y botón **`+ Nueva Cuenta / Subcuenta`** en la cabecera del Plan General Contable (`/cuentas`).
 - **Soporte para Grupo 17 y subcuentas a largo plazo**: Creación validada de deudas con entidades de crédito (`170`, `1700`, `17000001`) y proveedores de inmovilizado/acreedores a largo plazo (`173`, `1730`, `17300001`), con vinculación a cuenta madre y control de apuntabilidad (nivel $\ge 4$).
 
-### 3. Asistente y Autocompletado del PGC en el Libro Diario (`JournalEntryForm` / `AccountAutocomplete`)
+### 3. Asistente y Autocompletado del PGC en el Libro Diario (`LineEditor` / `AccountAutocomplete`)
 - **Validación al teclear**: Búsqueda en tiempo real de cuentas contables por prefijo de código o texto del nombre.
 - **Consulta del PGC por doble clic**: Hacer doble clic o pulsar la flecha desplegable abre inmediatamente la lista de cuentas apuntables del Plan General Contable de la empresa activa.
 - **Redirección automática al Alta si no existe**: Si la cuenta tecleada no existe en el PGC, el desplegable informa de la ausencia y ofrece un botón directo **`+ Alta en PGC`**, que precarga el código en `/cuentas/nueva` para darla de alta al instante sin perder el contexto.
+
+## Actualizaciones de Sesión (2026-10-07)
+
+### 1. Pantalla única de nuevo asiento
+
+Había **dos** pantallas de «Nuevo asiento», cada una con su motor:
+
+| Pantalla | Qué hacía | Resultado |
+|---|---|---|
+| `/asientos/nuevo` | `JournalEntryForm` → `POST /api/v1/journal/entries` | Guardaba un **borrador** que no aparecía en ninguna parte |
+| `/contabilidad/asientos/nuevo` | `LineEditor` → `POST /api/v1/asientos` | Asentaba directamente, pero la página estaba fuera del mapa de navegación |
+
+Queda **una sola**, `/asientos/nuevo`, con dos acciones:
+
+- **Asentar en el libro** (principal): `POST /api/v1/asientos` → asiento `POSTED`, visible en el diario al instante.
+- **Guardar borrador** (secundario): `POST /api/v1/journal/entries` → asiento `DRAFT`, redirige a `/asientos/{id}`.
+
+Se conserva el borrador porque los documentos adjuntos solo admiten baja lógica sobre asientos sin asentar (SPEC-030). La antigua `/contabilidad/asientos/nuevo` se eliminó y la navegación abre siempre la pantalla unificada con su rejilla de destinos y resumen.
+
+### 2. Filtro de estado en el libro diario
+
+- Desplegable de estado en `/asientos/diario`: **Publicados y anulados** (el comportamiento de siempre), `DRAFT`, `POSTED`, `CANCELLED` o Todos.
+- El filtro se envía como query string `?estado=`; valores desconocidos responden `422` con `estado_desconocido` / `estado_vacio`.
+- La vista por defecto **no cambia**: los borradores siguen excluidos salvo que se pidan.
+
+### 3. Asentar un borrador desde la aplicación
+
+En el detalle del asiento (`/asientos/[id]`) aparece el botón **Asentar en el libro diario** cuando el estado es `DRAFT`: confirma, llama a `POST /api/v1/journal/entries/{id}/post` y recarga. No se pinta en `POSTED` (inmutables) ni en `CANCELLED` (solo rectificativo).
+
+### 4. Verificación
+
+- `pytest`: **3094 passed / 6 failed / 45 skipped**. Los 6 fallos son **preexistentes** (probados con `git stash` sobre el árbol limpio): 3 tests de protección de cuentas que esperan un `409` y reciben el `IntegrityError` del trigger, 1 test del guard de siembra de empresas, 1 test con un texto sin tilde y el flaky conocido `test_suggest_perf`. Detalle en `AGENTS.md` §56.7.
+- `ruff` limpio (7 errores preexistentes de otra sesión autofijados), `mypy` limpio (420 fuentes), `tsc` y ESLint con **0 errores**.
+- `next build` verde con **91 páginas**, tras corregir un fallo preexistente: `/cuentas/nueva` usaba `useSearchParams()` sin `<Suspense>` y rompía la prerender.

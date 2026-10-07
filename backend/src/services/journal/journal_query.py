@@ -1,8 +1,11 @@
 """Diario consultation services (SPEC-002 US2): paginated diary and details.
 
-Solo asientos ``POSTED``/``CANCELLED`` de la empresa activa, orden
-``(fecha, numero_asiento)`` asc. El rango de fechas es obligatorio (422 si
-falta o está invertido). Importes siempre como strings con 4 decimales.
+Por defecto solo asientos ``POSTED``/``CANCELLED`` de la empresa activa (el
+borrador no forma parte del libro: ver `test_borrador_visible_por_id_pero_no_en_
+diario`), orden ``(fecha, numero_asiento)`` asc. El filtro se puede abrir con el
+parámetro opcional ``estado`` (valores coma-separados); el rango de fechas sigue
+siendo obligatorio (422 si falta o está invertido). Importes siempre como strings
+con 4 decimales.
 """
 
 from __future__ import annotations
@@ -23,6 +26,35 @@ from models.acct.journal import (
 from services.journal.entry_service import error
 
 PAGINA_MIN, PAGINA_MAX = 1, 100
+
+#: Estados que por defecto forman parte del libro.
+ESTADOS_DIARIO: tuple[JournalEntryEstado, ...] = (
+    JournalEntryEstado.POSTED,
+    JournalEntryEstado.CANCELLED,
+)
+
+
+def _estados_diario(estado: str | None) -> list[JournalEntryEstado]:
+    """Resuelve el filtro ``estado`` a una lista de miembros del enum.
+
+    ``None`` (sin parámetro) conserva el comportamiento histórico del diario:
+    solo asientos asentados y anulados. Una cadena se parte por comas, admite
+    minúsculas y espacios, y cualquier valor desconocido se rechaza con
+    ``estado_desconocido`` (422) en lugar de devolver cero filas en silencio.
+    """
+    if estado is None:
+        return list(ESTADOS_DIARIO)
+    partes = [p.strip().upper() for p in estado.split(",") if p.strip()]
+    if not partes:
+        raise error("estado_vacio", "estado no puede estar vacio")
+    validos = {e.value for e in JournalEntryEstado}
+    desconocidos = sorted({p for p in partes if p not in validos})
+    if desconocidos:
+        raise error(
+            "estado_desconocido",
+            "estado desconocido: " + ", ".join(desconocidos),
+        )
+    return list(dict.fromkeys(JournalEntryEstado(p) for p in partes))
 
 
 def _iso(fecha: date) -> str:
@@ -60,6 +92,7 @@ async def consultar_diario(
     date_to: date | None,
     page: int = 1,
     page_size: int = 20,
+    estado: str | None = None,
 ) -> dict:
     if date_from is None or date_to is None:
         raise error("rango_requerido", "El rango de fechas es obligatorio")
@@ -70,9 +103,10 @@ async def consultar_diario(
     if not (PAGINA_MIN <= page_size <= PAGINA_MAX):
         raise error("page_size_invalido", "page_size debe estar entre 1 y 100")
 
+    estados = _estados_diario(estado)
     base = select(JournalEntry).where(
         JournalEntry.empresa_id == empresa_id,
-        JournalEntry.estado.in_([JournalEntryEstado.POSTED, JournalEntryEstado.CANCELLED]),
+        JournalEntry.estado.in_(estados),
         JournalEntry.fecha >= date_from,
         JournalEntry.fecha <= date_to,
     )

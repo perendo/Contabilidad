@@ -1,4 +1,5 @@
 from api.treasury.cuentas_bancarias import router as cuentas_bancarias_router
+
 """Versioned treasury API router."""
 
 from fastapi import APIRouter, Depends

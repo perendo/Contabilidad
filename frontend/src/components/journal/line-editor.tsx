@@ -29,8 +29,14 @@ function filaVacia(): LineaMultilinea {
 
 export default function LineEditor({
   onGuardar,
+  onGuardarBorrador,
+  etiquetaGuardar = "Guardar asiento",
+  guardando = false,
 }: {
   onGuardar: (lineas: LineaMultilinea[]) => void;
+  onGuardarBorrador?: (lineas: LineaMultilinea[]) => void;
+  etiquetaGuardar?: string;
+  guardando?: boolean;
 }) {
   const [lineas, setLineas] = useState<LineaMultilinea[]>([
     filaVacia(),
@@ -190,12 +196,22 @@ export default function LineEditor({
         </span>
         <button
           type="button"
-          disabled={!cuadra}
+          disabled={!cuadra || guardando}
           onClick={() => onGuardar(lineas)}
           className="bg-blue-600 text-white rounded px-3 py-1 disabled:opacity-50"
         >
-          Guardar asiento
+          {etiquetaGuardar}
         </button>
+        {onGuardarBorrador && (
+          <button
+            type="button"
+            disabled={!cuadra || guardando}
+            onClick={() => onGuardarBorrador(lineas)}
+            className="rounded px-3 py-1 border disabled:opacity-50"
+          >
+            Guardar borrador
+          </button>
+        )}
       </div>
     </div>
   );

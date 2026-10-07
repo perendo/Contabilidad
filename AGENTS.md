@@ -417,7 +417,7 @@ documentadas.
 | 013 Conciliación | 54/54 | `models/treasury/{extracto,movimiento,conciliacion,periodo_conciliado,alerta}`, `services/reconciliation/*`, `api/reconciliation`, fixtures norma 43, frontend conciliación | 🟢 completa |
 | 020 Remesas SEPA | 69/69 | backend + frontend + migraciones | 🟢 completa |
 | 009 Apertura ejercicio | 37/37 | `models/fiscal/ejercicio`, `services/cycle/{validacion_previa,apertura}`, `api/ciclo`, migración 006, frontend apertura | 🟢 completa |
-| 006 Asientos multilínea | 40/40 | `services/journal/{validador_multilinea,motor,anulador}`, `api/journal/asientos`, `frontend/src/components/journal/line-editor.tsx`, `app/contabilidad/asientos/nuevo` | 🟢 completa |
+| 006 Asientos multilínea | 40/40 | `services/journal/{validador_multilinea,motor,anulador}`, `api/journal/asientos`, `frontend/src/components/journal/line-editor.tsx`, `app/asientos/nuevo` (pantalla única desde §56) | 🟢 completa |
 | 007 Facturación | 56/56 | `models/invoice/{serie_factura,factura,factura_linea}`, `services/invoicing/{numeracion,calculo_impuestos,recargo_equivalencia,criterio_caja,asiento_factura,emision,rectificacion}`, `api/invoicing/{deps,routes,series,facturas}`, `components/invoicing/api.ts`, `app/facturacion/*` | 🟢 completa |
 | 010 Cuentas anuales | 45/45 | `models/reporting/{configuracion,formulacion,control_efe}`, `services/reporting/{saldos,agrupacion,comparativo,pyg,efe,formulacion}`, `api/cuentas_anuales/{deps,routes,config}`, `components/reporting/*`, `app/{cuentas-anuales,balance,pyg,efe}` | 🟢 completa |
 | 012 Libros IVA | 56/56 | `models/fiscal/{periodo_fiscal,exportacion_modelo,configuracion_sii,configuracion_fiscal,iva_diferido_caja}`, `services/vat/{periodo,configuracion_cuentas,libros_iva,modelos,exportacion,recargo_equivalencia,criterio_caja,sii}`, `api/fiscal/*`, `components/vat/api.ts`, `app/{libros-iva,modelos,exportaciones}` | 🟢 completa |
@@ -2867,3 +2867,173 @@ Resumen de intervenciones implementadas y verificadas:
    - **Validación instantánea**: El usuario puede teclear código numérico o fragmento de denominación y el sistema valida contra las cuentas apuntables (`is_selectable = true`) de la empresa activa.
    - **Consulta PGC por doble clic**: Al hacer doble clic en el campo de la cuenta en cualquier línea del asiento (o pulsar la flecha desplegable), se listan las cuentas PGC apuntables activas disponibles.
    - **Desvío al Alta si no existe**: Si el código o búsqueda no coincide con ninguna cuenta en el PGC, el componente despliega un aviso con botón directo `+ Alta en PGC`, redirigiendo a `/cuentas/nueva?code=<codigo>` con el código precargado para su creación inmediata.
+
+## 56. Pantalla única de nuevo asiento, borradores visibles y estado en el diario (2026-10-07)
+
+Trabajo **fuera del ciclo de specs**, a peticion del usuario sobre la aplicacion en
+funcionamiento: unificar las dos pantallas «Nuevo asiento», poder ver y asentar los
+borradores desde la app (hoy se creaban y no aparecian en ningun sitio), filtrar por
+estado en el diario, documentar y subir a GitHub.
+
+### 56.1 · Lo que habia: dos pantallas, dos motores, y una fuera del mapa
+
+| Pantalla | Componente | Endpoint | Estado resultante | En el mapa de SPEC-031 |
+|---|---|---|---|---|
+| `/asientos/nuevo` | `JournalEntryForm` (SPEC-001) | `POST /api/v1/journal/entries` | `DRAFT` | si, es la canonica |
+| `/contabilidad/asientos/nuevo` | `LineEditor` (SPEC-006) | `POST /api/v1/asientos` | `POSTED` | **no**, y sin redirect |
+
+El asiento borrador creado por la primera **no se veia en ninguna parte**: el diario
+excluye `DRAFT` por defecto (y es intencional, SPEC-002 lo exige y los tests lo defienden),
+no habia filtro de estado, y la lista no enlazaba al detalle. La segunda asentaba
+directamente, pero al estar fuera del mapa abria sin rejilla de destinos ni resumen, que
+es exactamente el defecto de §51.
+
+**Decision**: una sola pantalla, `/asientos/nuevo`, sobre `LineEditor`, con dos acciones:
+
+- **Principal: «Asentar en el libro»** → `POST /api/v1/asientos` → `POSTED`. Entra en el
+  diario al instante.
+- **Secundaria: «Guardar borrador»** → `POST /api/v1/journal/entries` → `DRAFT` →
+  redirige a `/asientos/{id}`.
+
+**Por que el borrador se conserva y no se elimino en la fusion**: la baja logica de los
+documentos adjuntos solo se admite sobre asientos `DRAFT`
+(`backend/src/services/documentos/bajas.py:34`, SPEC-030 FR-010). Con una sola accion de
+asentar-directo, no habria forma de adjuntar y despues dar de baja un documento antes de
+asentar. Los dos botones se habilitan con `cuadra` y el mensaje de error del backend
+(422 por asiento desbalanceado o cuenta invalida) se muestra en la propia pagina.
+
+**Lo que NO se toco, y por que**: `AccountAutocomplete` guarda un `query` local y su
+`onChange` solo se dispara al elegir una sugerencia; si el usuario teclea un codigo sin
+elegir de la lista, `cuentaId`/`cuentaCodigo` quedan vacios y `cuadra` no se cumple.
+Cambiar eso es cambiar la logica de balance del editor: no hizo falta, porque los dos
+botones ya estan detras de `cuadra` y el backend responde el 422 del caso.
+
+### 56.2 · Estado en el libro diario
+
+- Backend: `services/journal/journal_query.py` gana `ESTADOS_DIARIO`,
+  `_estados_diario(estado)` y `consultar_diario(..., estado)`; `api/journal/journal.py`
+  expone el query param `estado`.
+- Desplegable en `app/asientos/diario/page.tsx`: `""` (Publicados y anulados, **el mismo
+  default de antes**: `POSTED, CANCELLED`), `DRAFT`, `POSTED`, `CANCELLED` y Todos; el
+  query string solo se anade si el valor no esta vacio.
+- **El default no se cambia**: excluir borradores del diario es norma de SPEC-002 y tiene
+  tests a su favor. Se anade el filtro **encima**, no se altera el comportamiento que ya
+  existia.
+- Codigos nuevos `estado_desconocido` / `estado_vacio` (**422**) porque `_http_error`
+  (`api/journal/journal.py`) ya mapea `estado_invalido` a **409**: ese 409 es correcto
+  para una transicion de estado y es el codigo equivocado para un valor de filtro mal
+  escrito.
+
+### 56.3 · Asentar un borrador desde la aplicacion
+
+`app/asientos/[id]/page.tsx` anade `asentar()`: confirmacion del usuario →
+`POST /api/v1/journal/entries/{id}/post` → recarga del detalle. El boton «Asentar en el
+libro diario» solo se pinta si `estado === "DRAFT"`: un `POSTED` es inmutable
+(constitucion II) y un `CANCELLED` solo admite rectificativo, de modo que pintarlo seria
+ofrecer una accion que el backend rechazara.
+
+### 56.4 · `REDIRIGIDAS` mentia, y tapaba un bug del parser de rutas
+
+Al borrar `/contabilidad/asientos/nuevo` quedo al descubierto que la lista `REDIRIGIDAS`
+de `test_guard_mapa_superficies.py` era en su mayor parte falsa: de sus cinco entradas,
+`/cierre`, `/cobros` y `/tesoreria/efe` **si tienen pantalla** y estan en el mapa de
+SPEC-031 (§51 ya lo decia), y `/contabilidad/asientos/nuevo` **no tenia redirect ninguno**
+era el hueco que §51 dejo escrito y nunca se cerro. Hoy la lista contiene unicamente
+`/contabilidad/import-export`, que si tiene su entrada en `next.config.mjs`.
+
+Y lo que la lista tapaba: `_entradas_mapa()` buscaba `d("` y **no veia las dos entradas
+multilinea** del mapa (`cierre-ejercicio` → `/cierre` e `informe-efe` →
+`/tesoreria/efe`), que se escriben en varias lineas por llevar comentario. Las dos
+funciones de pertenencia fallarian hoy si `REDIGIDAS` no las estuviera encubriendo con un
+falso «ya esta redirigida». Arreglado con `d\(\s*"` y comparando contra
+`plano = re.sub(r"\s+", " ", array)`.
+
+Guard nuevo, **seccion 4** de `test_guard_mapa_superficies.py` (4 tests), con el patron
+que ya uso §52: cada entrada de `REDIRIGIDAS` **debe** tener su redirect en
+`next.config.mjs` (`_fuentes_redirect()`), **no puede** tener pagina en el arbol de `app/`,
+y ninguna ruta puede estar a la vez en `REDIRIGIDAS` y en el mapa. La lista ya no puede
+mentir en ninguna de las dos direcciones.
+
+### 56.5 · La segunda consolidacion y sus tests
+
+`test_rutas_consolidadas.py` gana la tabla de esta segunda fusion (la de §51 solo
+documentaba import-export) y cuatro tests: hay **una sola** pantalla de alta de asientos
+(`_paginas_de_alta_de_asientos() == ["/asientos/nuevo"]`), la antigua
+`/contabilidad/asientos/nuevo` no existe ni figura en el config, y la pantalla unificada
+declara las dos acciones. Un quinto comprueba que `app/contabilidad/asientos/` no tiene
+ninguna pagina.
+
+Borrados `frontend/src/app/contabilidad/asientos/` (todo el arbol) y
+`frontend/src/components/journal/JournalEntryForm.tsx`; no quedan referencias vivas.
+
+Bug del propio guard, corregido antes de cerrar: `_paginas_de_alta_de_asientos` devolvia
+`[]` por una comilla de mas en el `f'{ruta}"'`, de modo que la asercion nunca podia
+devolver `["/asientos/nuevo"]`. Un guard recien escrito se prueba **haciendolo fallar**.
+
+### 56.6 · Verificacion
+
+| Puerta | Resultado |
+|---|---|
+| `pytest` (suite completa, SQLite) | **3094 passed / 6 failed / 45 skipped** en 1.566 s. Los 6 fallos son preexistentes (§56.7); ninguno es de esta sesion |
+| `ruff check src tests` | limpio tras `--fix` de **7 errores preexistentes de §54** (I001 de imports en `api/treasury/routes.py`, `models/treasury/__init__.py`, `services/treasury/cuentas_bancarias.py` y `tests/unit/test_cuentas_bancarias_tesoreria.py`, 2 F401 y RUF022 del `__all__`) |
+| `mypy` | limpio, **420 fuentes** |
+| `tsc --noEmit` | limpio |
+| ESLint | **0 errores**, 2 warnings preexistentes (`tesoreria/page.tsx` `cargando` sin usar, `ContextZone.tsx` dependencia `pathname`). Se corrigio el unico error preexistente (`ref={listaRef as any}` de `AccountAutocomplete`) sin tocar la logica: dos refs, uno por tipo de contenedor |
+| `next build` | verde, **91 paginas**, Middleware 34 kB, tras arreglar un defecto preexistente que lo rompia (ver abajo) |
+
+**El build estaba roto, y no por esta sesion.** `/cuentas/nueva` usa `useSearchParams()`
+(supuesto `?code=` de §52) sin limite `<Suspense>`, y `next build` se paraba en la
+prerender con `missing-suspense-with-csr-bailout`. Arreglado con el wrapper tipico
+(`NuevaCuentaForm` + `<Suspense>` en el default export).
+
+### 56.7 · Seis fallos que ya estaban en HEAD (y como se demostro)
+
+La suite completa da **6 fallos**. Para no atribuirselos a esta sesion se ejecutaron los
+cinco deterministas **sobre el arbol limpio**: `git stash push` → misma seleccion de tests
+→ `git stash pop`. **Los mismos 6 fallos sin ningun cambio mio**, asi que son
+preexistentes:
+
+| Test | Motivo real |
+|---|---|
+| `test_proteccion_cuenta_movimiento::test_desactivar_cuenta_con_asientos_rechazado_409` | el trigger `account_plan: no se puede desactivar una cuenta con asientos asociados` revienta como `IntegrityError` sin traducirse a 409 |
+| `test_proteccion_integracion::test_desactivar_cuenta_con_imputaciones_409_intacta` | igual |
+| `test_quickstart_pgc::test_scenario4_edicion_y_proteccion` | igual |
+| `test_guard_siembra_empresa::test_no_aparece_ningun_company_nuevo_a_mano` | `tests/unit/test_cuentas_bancarias_tesoreria.py` (§54) construye `Company(` a mano y **no esta en `PENDIENTES`**: la cremalla de §47 funciona exactamente como avisa |
+| `test_navegacion_menu_sesion::test_con_una_sola_empresa_el_menu_lo_dice` | busca la cadena sin tilde `unica empresa a la que tienes acceso` y el codigo la trae acentuada |
+| `test_suggest_perf` | flaky conocido de SPEC-001 bajo carga |
+
+**Ninguno de los seis esta arreglado.** Los cuatro primeros son un bug real de la API
+(500 donde el contrato dice 409) y el quinto es deuda de §47 abierta por la sesion de
+cuentas bancarias: los dos merecen su propia sesion, no un parche al pasar. Se documentan
+aqui para que la siguiente no los descubra como «regresion».
+
+### 56.8 · Lecciones reutilizables
+
+- **`tsc` y ESLint no compilan.** Ambos pasaron en verde con `/cuentas/nueva` roto para el
+  build: `useSearchParams` sin `Suspense` solo revienta en la prerender de `next build`.
+  Es la misma forma que §51 (una puerta que mira otro sitio que el del usuario), ahora en
+  el lado de las herramientas.
+- **Distinguir «lo he roto yo» de «ya estaba roto» cuesta un `git stash`.** Sin el, los
+  seis fallos se leen como una regresion de esta sesion y se pierde media tarde
+  investigando el cambio equivocado. Orden seguro: `stash` → test → `stash pop`, sin
+  salir del mismo terminal, y con los cambios ya guardados en el stash.
+- **Una lista de pendientes puede mentir en dos direcciones a la vez.** `REDIRIGIDAS`
+  decia «esta redirigida» de rutas que no lo estaban, y al mismo tiempo el parser de
+  entradas decia «no hay entradas» de las que si lo estaban. Los dos errores se
+  compensaban y el guard pasaba en verde con media funcion rota.
+- **`REDIRIGIDAS` es un `PENDIENTES` y tiene que tener sus guardias**, como ya tiene
+  `test_guard_siembra_empresa` (§47) y `TABLAS_SIN_MIGRACION` (§52.3): que no nombre
+  cosas que no existen, que no olvide cosas que si, y que cada entrada sea verificable
+  contra su fuente.
+- **Un guard nuevo se valida haciendolo fallar.** `_paginas_de_alta_de_asientos` salio
+  con una comilla de mas y devolvia `[]`; la asercion mas estricta del fichero
+  (`== ["/asientos/nuevo"]`) era la que lo delataba. Ademas, no importes ese helper desde
+  otro test (§43): esta duplicado a proposito.
+- **Un ref tipado con union no sirve para dos elementos distintos.**
+  `useRef<HTMLUListElement | HTMLDivElement | null>` no asigna a `<ul ref={...}>` ni a
+  `<div ref={...}>` (los `RefObject` son invariantes): cada contenedor lleva el suyo y el
+  detector de clics fuera mira los tres. Evita el `as any` que ESLint ya marcaba.
+- **`ruff` arregla el codigo de otras sesiones si la puerta es global.** Los 7 errores
+  que arreglaron `--fix` eran de §54 y ningun test los veia; la puerta es una sola, y
+  dejarla roja por «no es mio» es dejarla roja.
+

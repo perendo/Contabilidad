@@ -31,6 +31,31 @@ comprobar aquí:
 3. Las tres conservadas existen **y** están en el mapa. Una pantalla que existe pero no
    está en el mapa es lo que se acaba de arreglar, así que el test vigila que no vuelva.
 4. Ninguna ruta del mapa apunta a un fichero inexistente.
+
+EL SEGUNDO CONSOLIDADO: "Nuevo asiento"
+---------------------------------------
+
+SPEC-002 y SPEC-006 dejaron **dos** pantallas de alta de asientos con el mismo aspecto y
+destinos distintos:
+
+| Ruta | Formulario | Endpoint | ¿En el mapa? |
+|---|---|---|---|
+| `/asientos/nuevo` | `JournalEntryForm` (SPEC-001) | `POST /journal/entries` → **DRAFT** | sí, es la canónica |
+| `/contabilidad/asientos/nuevo` | `LineEditor` (SPEC-006) | `POST /asientos` → **POSTED** | **no**, y sin redirect |
+
+El síntoma en producción era directo: un asiento creado desde la navegación **no aparecía
+en el libro diario**, que solo lista `POSTED`/`CANCELLED` por contrato histórico. La ruta
+fuera del mapa estaba además autorizada por `REDIRIGIDAS`, que decía "canónica
+/asientos/nuevo" sin que hubiera redirect ninguno: una lista que miente deja de ser una red.
+
+Decisión: una sola pantalla en la canónica, con `LineEditor` y dos acciones —
+**Asentar** (`POST /api/v1/asientos`, asienta de una vez) y **Guardar borrador**
+(`POST /api/v1/journal/entries`). Se conserva la vía borrador porque la baja lógica de
+documentos solo se admite sobre `DRAFT` (SPEC-030, FR-010) y porque los borradores ya
+existentes tienen que poder asentarse desde la app: ahora, con el filtro de estado del
+diario, se ven y se asientan.
+
+Las 4-8 de mas abajo fijan esa decisión.
 """
 
 from __future__ import annotations
@@ -42,6 +67,7 @@ RAIZ = Path(__file__).resolve().parents[3]
 APP = RAIZ / "frontend" / "src" / "app"
 CONFIG = RAIZ / "frontend" / "next.config.mjs"
 SUPERFICIES = RAIZ / "frontend" / "src" / "components" / "navigation" / "surfaces.ts"
+NUEVO_ASIENTO = APP / "asientos" / "nuevo" / "page.tsx"
 
 PATRON_DESTINO = re.compile(r'd\(\s*"([a-z0-9_-]+)"\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"')
 
@@ -158,3 +184,64 @@ def test_ninguna_etiqueta_de_superficie_es_un_acronimo() -> None:
         assert re.fullmatch(r"[A-ZÁÉÍÓÚÑ][a-záéíóúñ]+", etiqueta), (
             f"«{etiqueta}» no es una palabra corriente"
         )
+
+
+# ---------------------------------------------------------------------------
+# 4. "Nuevo asiento" es una sola pantalla
+# ---------------------------------------------------------------------------
+
+
+def _paginas_de_alta_de_asientos() -> list[str]:
+    """Rutas cuyo `page.tsx` **crea** un asiento (POST a la raíz del recurso).
+
+    El patrón exige la comilla que cierra la cadena justo después del recurso, así que
+    `POST .../reverse`, `.../post` o `.../importar/confirmar` no cuentan: son acciones
+    sobre un asiento ya creado o sobre un fichero. También se pide que haya un `post`,
+    para que un `page.tsx` que solo LEA `/api/v1/asientos` (el diario, el detalle) no
+    salga aquí.
+    """
+    altas: list[str] = []
+    for pagina in APP.glob("**/page.tsx"):
+        texto = pagina.read_text(encoding="utf-8")
+        if "post" not in texto:
+            continue
+        crea_en = ('"/api/v1/asientos"', '"/api/v1/journal/entries"')
+        if any(ruta in texto for ruta in crea_en):
+            rel = pagina.parent.relative_to(APP).as_posix()
+            altas.append("/" + rel)
+    return sorted(altas)
+
+
+def test_hay_una_sola_pantalla_de_alta_de_asientos() -> None:
+    """La que estaba en el mapa y la que no, fusionadas en una.
+
+    Mientras existan dos, vuelve el defecto: una de ellas crea borradores que el libro
+    diario no enseña, y ninguna de las dos es obviamente la correcta para quien llega
+    por la navegación.
+    """
+    assert _paginas_de_alta_de_asientos() == ["/asientos/nuevo"]
+
+
+def test_la_pantalla_de_borrador_de_contabilidad_ya_no_existe() -> None:
+    """La ruta fuera del mapa se borró, no se vació ni se dejó un redirect.
+
+    `next.config.mjs` no tiene ningún redirect con esa fuente: si la ruta sigue en el
+    árbol, es una pantalla duplicada sirviendo a la vez.
+    """
+    assert not _existe("/contabilidad/asientos/nuevo")
+    assert 'source: "/contabilidad/asientos/nuevo"' not in CONFIG.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_la_pantalla_unificada_tiene_las_dos_acciones() -> None:
+    """Asentar y guardar borrador, las dos en la misma pantalla.
+
+    Si una de las dos desaparece, hay que volver a la decisión anterior: o se asienta
+    directo (y no se pueden rectificar los borradores con documentos) o solo se guardan
+    borradores (y un asiento creado desde la app no sale en el diario).
+    """
+    texto = NUEVO_ASIENTO.read_text(encoding="utf-8")
+    assert '"/api/v1/asientos"' in texto, "falta la accion Asentar"
+    assert '"/api/v1/journal/entries"' in texto, "falta la accion Guardar borrador"
+    assert "asentar" in texto and "guardarBorrador" in texto

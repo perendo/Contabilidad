@@ -48,14 +48,19 @@ APP = RAIZ / "frontend" / "src" / "app"
 #: tiene que volver a usar esta lista en vez de inventar otra.
 PENDIENTES: dict[str, str] = {}
 
-#: Direcciones que se eliminan en US6 porque un redirect de `next.config.mjs` las
-#: resuelve antes del enrutado. Mismo criterio que las pendientes: solo se encoge.
+#: Direcciones que no tienen pantalla: un redirect de `next.config.mjs` las resuelve
+#: antes del enrutado. Mismo criterio que las pendientes: solo se encoge.
+#:
+#: **SOLO `/contabilidad/import-export` desde la unificación de "nuevo asiento".** Antes
+#: habia cinco y el diccionario mentia en cuatro de ellas: `/cierre`, `/cobros` y
+#: `/tesoreria/efe` conservan su pantalla y estan en el mapa (US6 decidio no borrarlas,
+#: ver `test_rutas_consolidadas`), y `/contabilidad/asientos/nuevo` **no tenia redirect
+#: ninguno** — era una pantalla real fuera del mapa que este guard autorizaba diciendo
+#: "canonica /asientos/nuevo". Se fusiono con la canonica y desaparecio. Por eso las dos
+#: comprobaciones de mas abajo: una lista que no coincide con `next.config.mjs` deja de
+#: ser una red y pasa a ser una puerta abierta.
 REDIRIGIDAS: dict[str, str] = {
-    "/contabilidad/asientos/nuevo": "canonica /asientos/nuevo",
     "/contabilidad/import-export": "canonica /asientos/import-export",
-    "/cierre": "canonica /cierres",
-    "/cobros": "canonica /vencimientos",
-    "/tesoreria/efe": "canonica /efe",
 }
 
 
@@ -73,9 +78,15 @@ def _rutas_reales() -> set[str]:
 
 
 def _entradas_mapa() -> list[tuple[str, str, str]]:
-    """`(clave, etiqueta, ruta)` de cada `d(...)` declarado en el mapa."""
+    r"""`(clave, etiqueta, ruta)` de cada `d(...)` declarado en el mapa.
+
+    `\s*` tras `d(` es obligatorio: dos destinos (`cierre-ejercicio` e `informe-efe`)
+    se declaran en varias lineas porque sus etiquetas son largas. Con la forma estricta
+    `d("` el guard no los veia, y solo pasaban porque estaban en `REDIRIGIDAS`, es decir,
+    la lista de redirecciones les tapaba la ausencia del mapa.
+    """
     texto = _leer_mapa()
-    return re.findall(r'd\("([^"]+)",\s*"([^"]*)",\s*"([^"]*)"', texto)
+    return re.findall(r'd\(\s*"([^"]+)",\s*"([^"]*)",\s*"([^"]*)"', texto)
 
 
 def _rutas_mapa() -> set[str]:
@@ -200,6 +211,8 @@ def test_una_clave_no_se_deriva_de_su_ruta() -> None:
     """
     entradas = _entradas_mapa()
     array = _array_superficies()
+    # Espacio plano para poder comparar declaraciones escritas en varias lineas.
+    plano = re.sub(r"\s+", " ", array)
     # Toda entrada se escribe como literal completo: `d("clave", "etiqueta", ...)`.
     # Un patron como `d("...", "..."` es justamente la forma buena, asi que lo que
     # se busca es la ausencia de las formas malas: plantilla, concatenacion, o una
@@ -207,11 +220,11 @@ def test_una_clave_no_se_deriva_de_su_ruta() -> None:
     assert not re.search(r"d\(`", array), "alguna clave usa una plantilla"
     assert not re.search(r'd\(\s*"\s*"\s*[,)]', array), "hay una clave vacia"
     for clave, etiqueta, ruta in entradas:
-        assert f'"{clave}", "{etiqueta}"' in array, (
+        assert f'"{clave}", "{etiqueta}"' in plano, (
             f"la entrada {clave!r} no se escribe como literal en el array"
         )
         if ruta:
-            assert f'"{ruta}"' in array, (
+            assert f'"{ruta}"' in plano, (
                 f"la ruta de {clave!r} no se escribe como literal"
             )
     # Prueba de que la separacion existe de verdad: al menos un destino cuya clave
@@ -340,3 +353,55 @@ def test_toda_superficie_declara_un_destino_por_ejercicio() -> None:
 def test_cada_superficie_tiene_su_landing_declarada(ruta: str) -> None:
     landings = set(re.findall(r'landing:\s*"([^"]+)"', _leer_mapa()))
     assert ruta in landings, f"la superficie {ruta} no declara su landing"
+
+
+# ---------------------------------------------------------------------------
+# 4. REDIRIGIDAS no miente
+# ---------------------------------------------------------------------------
+
+
+def _fuentes_redirect() -> set[str]:
+    cfg = RAIZ / "frontend" / "next.config.mjs"
+    assert cfg.exists(), f"falta next.config.mjs: {cfg}"
+    return set(re.findall(r'source:\s*"([^"]+)"', cfg.read_text(encoding="utf-8")))
+
+
+def test_toda_redirigida_tiene_un_redirect_de_verdad() -> None:
+    """Una entrada de `REDIRIGIDAS` sin su `source:` en `next.config.mjs` es un falso.
+
+    Esto es exactamente lo que pasaba con `/contabilidad/asientos/nuevo`: decia
+    "canonica /asientos/nuevo" y no habia redirect ninguno, de modo que la pantalla
+    seguia en el arbol fuera del mapa y el guard la daba por asignada. Una lista que
+    miente deja de ser una red y pasa a ser una puerta abierta.
+    """
+    fuentes = _fuentes_redirect()
+    sin_redirect = sorted(r for r in REDIRIGIDAS if r not in fuentes)
+    assert sin_redirect == [], (
+        "REDIRIGIDAS declara rutas sin redirect en next.config.mjs:\n"
+        + "\n".join(f"  {r}" for r in sin_redirect)
+    )
+
+
+def test_las_redirigidas_no_tienen_pantalla() -> None:
+    """La otra mitad: un redirect sobre una ruta que sigue teniendo pantalla no redirige."""
+    reales = _rutas_reales()
+    con_pantalla = sorted(r for r in REDIRIGIDAS if r in reales)
+    assert con_pantalla == [], (
+        "REDIRIGIDAS apunta a rutas que todavia tienen page.tsx:\n"
+        + "\n".join(f"  {r}" for r in con_pantalla)
+    )
+
+
+def test_ningun_redirect_doble_con_una_pantalla() -> None:
+    """Recorrido general: ninguna fuente de `next.config.mjs` conserva su pantalla.
+
+    No solo las de `REDIRIGIDAS`: el fichero de configuracion es la fuente de verdad,
+    y si se le añade un redirect sin borrar la pantalla, el usuario veria el formulario
+    anterior un instante en lugar del 308.
+    """
+    reales = _rutas_reales()
+    con_pantalla = sorted(f for f in _fuentes_redirect() if f in reales)
+    assert con_pantalla == [], (
+        "redirects cuya fuente todavia tiene pantalla:\n"
+        + "\n".join(f"  {r}" for r in con_pantalla)
+    )

@@ -169,6 +169,15 @@ async def listar_diario(
     date_to: Annotated[date | None, Query(description="Fin del rango (obligatorio)")] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    estado: Annotated[
+        str | None,
+        Query(
+            description=(
+                "Estados a incluir, coma-separados (DRAFT, POSTED, CANCELLED). "
+                "Por defecto POSTED,CANCELLED: el borrador no forma parte del libro"
+            )
+        ),
+    ] = None,
 ) -> dict:
     try:
         return await consultar_diario(
@@ -178,6 +187,7 @@ async def listar_diario(
             date_to=date_to,
             page=page,
             page_size=page_size,
+            estado=estado,
         )
     except AsientoError as exc:
         raise _http_error(exc) from exc
