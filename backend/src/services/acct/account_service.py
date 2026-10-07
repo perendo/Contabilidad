@@ -1,4 +1,4 @@
-"""Account service (SPEC-001 US2+US3+US4): tenant-scoped selectable accounts, create, update."""
+"""Account plan service: business logic for tree, suggest, and CRUD."""
 
 from __future__ import annotations
 
@@ -9,14 +9,14 @@ from models.acct.account_plan import AccountPlan
 from services.audit.writer import audit_escribir
 
 
-class SuggestError(ValueError):
-    """Raised when an account suggestion query is invalid."""
+class SuggestError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.code = "suggest_error"
 
 
-class AccountError(ValueError):
-    """Raised when an account operation fails."""
-
-    def __init__(self, message: str, code: str = "account_error"):
+class AccountError(Exception):
+    def __init__(self, message: str, code: str) -> None:
         super().__init__(message)
         self.code = code
 
@@ -51,6 +51,7 @@ async def suggest(
             .limit(limit)
         )
     ).all()
+
     return [
         {
             "id": cuenta.id,
@@ -85,6 +86,44 @@ async def crear_cuenta(
     else:
         raise AccountError("código demasiado largo (máx 8 dígitos)", "code_too_long")
 
+    # Autodeducción del padre si no se especifica y el nivel > 1
+    if parent_id is None and expected_level > 1:
+        # Longitudes candidatas de la cuenta padre en orden decreciente
+        prefijos = []
+        if expected_level == 5:
+            # Para nivel 5, el padre debe ser nivel 4 (4 dígitos)
+            prefijos = [code[:4]]
+        elif expected_level == 4:
+            # Para nivel 4, el padre debe ser nivel 3 (3 dígitos)
+            prefijos = [code[:3]]
+        elif expected_level == 3:
+            # Para nivel 3, el padre debe ser nivel 2 (2 dígitos)
+            prefijos = [code[:2]]
+        elif expected_level == 2:
+            # Para nivel 2, el padre debe ser nivel 1 (1 dígito)
+            prefijos = [code[:1]]
+
+        for pref in prefijos:
+            padre_candidato = await db.scalar(
+                select(AccountPlan).where(
+                    AccountPlan.tenant_id == tenant_id,
+                    AccountPlan.code == pref,
+                    AccountPlan.level == expected_level - 1,
+                    AccountPlan.is_active.is_(True),
+                )
+            )
+            if padre_candidato is not None:
+                parent_id = padre_candidato.id
+                break
+
+        if parent_id is None:
+            # Determinar código esperado del padre para informar con exactitud
+            padre_sug = prefijos[0] if prefijos else ""
+            raise AccountError(
+                f"No se encontró la cuenta padre activa '{padre_sug}' (nivel {expected_level - 1}) para crear '{code}'. Debes dar de alta primero la cuenta '{padre_sug}'.",
+                "parent_required",
+            )
+
     # Validar padre si se proporciona
     parent = None
     if parent_id is not None:
@@ -96,9 +135,15 @@ async def crear_cuenta(
         if parent.level >= 5:
             raise AccountError("no se puede crear hija de una cuenta de nivel 5", "parent_level_max")
         if parent.level + 1 != expected_level:
-            raise AccountError("nivel de la cuenta no coincide con el padre + 1", "level_mismatch")
+            raise AccountError(
+                f"Nivel de la cuenta ({expected_level}) no coincide con el padre + 1 (nivel del padre '{parent.code}': {parent.level}).",
+                "level_mismatch",
+            )
         if not code.startswith(parent.code):
-            raise AccountError("el código debe heredar el prefijo del padre", "code_prefix_mismatch")
+            raise AccountError(
+                f"El código '{code}' debe heredar el prefijo del padre '{parent.code}'.",
+                "code_prefix_mismatch",
+            )
 
     # Verificar nivel máximo
     if expected_level > 5:
@@ -129,7 +174,7 @@ async def crear_cuenta(
     await audit_escribir(
         db,
         empresa_id=tenant_id,
-        actor="user",  # Se sobrescribirá en el endpoint con el usuario real
+        actor="user",
         action="CREATE",
         entity="account_plan",
         entity_id=cuenta.id,
@@ -162,6 +207,7 @@ async def actualizar_cuenta(
         raise AccountError("cuenta inexistente en la empresa activa", "not_found")
 
     payload: dict = {}
+
     if name is not None and name != cuenta.name:
         # Verificar unicidad del nombre
         existing = await db.scalar(
@@ -173,30 +219,14 @@ async def actualizar_cuenta(
         )
         if existing:
             raise AccountError("nombre ya existente en la empresa", "name_duplicate")
-        payload["name"] = {"old": cuenta.name, "new": name}
+        payload["name_anterior"] = cuenta.name
+        payload["name_nuevo"] = name
         cuenta.name = name
 
     if is_active is not None and is_active != cuenta.is_active:
-        if is_active is False:
-            # Desactivar: verificar protección (trigger DB lo hace, pero validamos antes para mensaje amigable)
-            from models.acct.journal import JournalEntryLine
-
-            used = await db.scalar(
-                select(JournalEntryLine.id).where(
-                    JournalEntryLine.account_id == cuenta.id,
-                    JournalEntryLine.empresa_id == tenant_id,
-                ).limit(1)
-            )
-            if used:
-                raise AccountError(
-                    "no se puede desactivar una cuenta con asientos asociados",
-                    "account_has_entries",
-                )
-        payload["is_active"] = {"old": cuenta.is_active, "new": is_active}
+        payload["is_active_anterior"] = cuenta.is_active
+        payload["is_active_nuevo"] = is_active
         cuenta.is_active = is_active
-
-    if not payload:
-        return cuenta
 
     await db.flush()
 

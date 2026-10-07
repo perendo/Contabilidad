@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_empresa_id, require_permission
@@ -85,9 +86,29 @@ async def crear(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         if e.code in ("parent_not_found", "parent_inactive"):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-        if e.code in ("parent_level_max", "level_mismatch", "code_prefix_mismatch", "level_max", "code_not_numeric", "code_too_long"):
+        if e.code in (
+            "parent_required",
+            "parent_level_max",
+            "level_mismatch",
+            "code_prefix_mismatch",
+            "level_max",
+            "code_not_numeric",
+            "code_too_long",
+        ):
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except (IntegrityError, DBAPIError) as db_exc:
+        msg = str(db_exc.orig if hasattr(db_exc, "orig") and db_exc.orig else db_exc)
+        if "account_plan:" in msg:
+            limpio = msg.split("account_plan:")[-1].split("\n")[0].strip()
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Regla PGC: {limpio}",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Error de base de datos al validar jerarquía PGC: {msg}",
+        )
 
     return CuentaResponse(
         id=cuenta.id,
@@ -111,7 +132,6 @@ async def actualizar(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="al menos un campo (name o is_active) es requerido",
         )
-
     try:
         cuenta = await actualizar_cuenta(db, empresa_id, account_id, name=data.name, is_active=data.is_active)
     except AccountError as e:
@@ -119,9 +139,16 @@ async def actualizar(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
         if e.code == "name_duplicate":
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
-        if e.code == "account_has_entries":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except (IntegrityError, DBAPIError) as db_exc:
+        msg = str(db_exc.orig if hasattr(db_exc, "orig") and db_exc.orig else db_exc)
+        if "account_plan:" in msg:
+            limpio = msg.split("account_plan:")[-1].split("\n")[0].strip()
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Regla PGC: {limpio}",
+            )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
     return CuentaResponse(
         id=cuenta.id,
@@ -143,13 +170,6 @@ async def detalle(
     if cuenta is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Cuenta inexistente en la empresa activa",
+            detail="cuenta no encontrada",
         )
-    return CuentaResponse(
-        id=cuenta.id,
-        code=cuenta.code,
-        name=cuenta.name,
-        level=cuenta.level,
-        is_selectable=cuenta.is_selectable,
-        is_active=cuenta.is_active,
-    )
+    return cuenta
