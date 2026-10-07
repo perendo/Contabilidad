@@ -1,78 +1,79 @@
 "use client";
 
 /**
- * MENU DE SESION (SPEC-031, US1, T085-T087)
+ * MENU DE SESION Y CONTEXTO
  *
- * Alto contraste: botón de fondo blanco con texto negro, y menú desplegable con
- * fondo blanco, texto negro y opciones activas en azul con texto blanco.
+ * Muestra el usuario autenticado, su rol y las opciones de cambio de contexto
+ * (empresa y ejercicio) y cierre de sesion.
  */
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { limpiarSesion } from "@/services/client";
+import { useSession } from "./SessionContext";
 import { setEjercicioActivo } from "./ejercicio";
-import { useSesion } from "./SessionContext";
-import { clase, etiqueta } from "./ExerciseSwitcher";
-import type { EmpresaResumen } from "./CompanySwitcher";
 
-export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }) {
+export default function SessionMenu() {
   const router = useRouter();
-  const { contexto, cambiarEmpresa, cambiarEjercicio } = useSesion();
+  const { contexto, recargar } = useSession();
   const [abierto, setAbierto] = useState(false);
   const [seccion, setSeccion] = useState<"empresa" | "ejercicio" | null>(null);
   const contenedor = useRef<HTMLDivElement>(null);
-  const boton = useRef<HTMLButtonElement>(null);
-  const panelId = useId();
 
+  // Cierre al pulsar fuera y con Escape
   useEffect(() => {
-    if (!abierto) return;
-    const fuera = (evento: MouseEvent) => {
-      if (!contenedor.current?.contains(evento.target as Node)) setAbierto(false);
-    };
-    const alEsc = (evento: KeyboardEvent) => {
-      if (evento.key !== "Escape") return;
-      setAbierto(false);
-      setSeccion(null);
-      boton.current?.focus();
-    };
-    document.addEventListener("mousedown", fuera);
-    document.addEventListener("keydown", alEsc);
-    return () => {
-      document.removeEventListener("mousedown", fuera);
-      document.removeEventListener("keydown", alEsc);
-    };
-  }, [abierto]);
-
-  const cerrar = () => {
-    setAbierto(false);
-    setSeccion(null);
-    boton.current?.focus();
-  };
-
-  const salir = () => {
-    try {
-      setEjercicioActivo(null);
-    } catch {
-      // Ignorar si el storage no está disponible
-    }
-    limpiarSesion();
-    setAbierto(false);
-    router.push("/login");
-  };
-
-  const alTeclado = (evento: React.KeyboardEvent) => {
-    if (evento.key === "ArrowDown" || evento.key === "Enter" || evento.key === " ") {
-      if (!abierto) {
-        evento.preventDefault();
-        setAbierto(true);
-        return;
+    function manejarClickFuera(e: MouseEvent) {
+      if (contenedor.current && !contenedor.current.contains(e.target as Node)) {
+        setAbierto(false);
+        setSeccion(null);
       }
     }
-    if (evento.key === "Escape") {
+    function manejarTecla(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setAbierto(false);
+        setSeccion(null);
+      }
+    }
+    document.addEventListener("mousedown", manejarClickFuera);
+    document.addEventListener("keydown", manejarTecla);
+    return () => {
+      document.removeEventListener("mousedown", manejarClickFuera);
+      document.removeEventListener("keydown", manejarTecla);
+    };
+  }, []);
+
+  const empresas = contexto?.empresas || [];
+  const empresaActiva = contexto?.empresa_activa;
+  const ejercicioActivo = contexto?.ejercicio_activo;
+
+  const cambiarEmpresa = async (id: number) => {
+    try {
+      localStorage.setItem("empresa_activa_id", String(id));
+      await recargar();
       setAbierto(false);
       setSeccion(null);
-      boton.current?.focus();
+      router.refresh();
+    } catch (e) {
+      console.error("Error al cambiar empresa", e);
     }
+  };
+
+  const cambiarEjercicio = async (anio: number) => {
+    try {
+      setEjercicioActivo(anio);
+      await recargar();
+      setAbierto(false);
+      setSeccion(null);
+      router.refresh();
+    } catch (e) {
+      console.error("Error al cambiar ejercicio", e);
+    }
+  };
+
+  const cerrarSesion = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("empresa_activa_id");
+    localStorage.removeItem("ejercicio_activo");
+    router.push("/login");
   };
 
   if (!contexto) return null;
@@ -83,63 +84,33 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
   return (
     <div ref={contenedor} className="relative">
       <button
-        ref={boton}
-        type="button"
-        onClick={() => setAbierto((v) => !v)}
-        onKeyDown={alTeclado}
-        aria-haspopup="menu"
+        onClick={() => setAbierto(!abierto)}
+        aria-haspopup="true"
         aria-expanded={abierto}
-        aria-controls={abierto ? panelId : undefined}
-        title={`${usuario.email}${usuario.rol ? ` · ${usuario.rol}` : ""}`}
-        className="flex items-center gap-2 bg-white border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-900 shadow-sm hover:bg-slate-50 hover:border-slate-400 focus-visible:outline-2 focus-visible:outline-blue-600 transition-all"
+        className="flex items-center gap-2 rounded-xl bg-white px-3 py-1.5 text-xs text-slate-900 shadow-sm border border-slate-300 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-blue-600 transition-colors font-medium"
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="w-4 h-4 text-slate-700 shrink-0"
-        >
-          <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-
-        <span className="font-mono text-xs font-bold truncate max-w-[12rem] text-slate-900">
-          {usuario.email || usuario.nombre}
+        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 text-[10px] font-bold text-blue-800">
+          {usuario?.email?.slice(0, 2).toUpperCase() || "US"}
         </span>
-
-        {usuario.rol && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-bold border border-slate-300">
-            {usuario.rol}
-          </span>
-        )}
-
-        <svg aria-hidden="true" viewBox="0 0 10 6" className="h-1.5 w-2 shrink-0 text-slate-600 ml-1">
-          <path d="M0 0h10L5 6z" fill="currentColor" />
+        <span className="font-semibold text-slate-900 max-w-[120px] truncate">{usuario?.email || "Usuario"}</span>
+        <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-slate-700">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
         </svg>
       </button>
 
-      {/* Desplegable con alto contraste: fondo blanco, texto negro, y selección azul con texto blanco */}
       {abierto && (
-        <div
-          id={panelId}
-          role="menu"
-          aria-label="Sesion"
-          className="absolute right-0 top-full z-50 mt-1 w-80 rounded-xl border border-slate-300 bg-white p-2 shadow-2xl text-slate-900"
-        >
-          <div className="border-b border-slate-200 px-3 py-2">
-            <p className="truncate text-xs font-bold text-black">{usuario.nombre}</p>
-            <p className="truncate font-mono text-[11px] text-slate-600">{usuario.email}</p>
-            {usuario.rol && <p className="text-[11px] text-slate-700 mt-0.5 font-semibold">Rol: {usuario.rol}</p>}
+        <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-white p-2 shadow-2xl border border-slate-300 text-xs text-slate-900 z-50">
+          <div className="px-3 py-2.5 border-b border-slate-200">
+            <div className="font-bold text-slate-900 truncate">{usuario?.nombre || usuario?.email}</div>
+            <div className="text-[11px] text-slate-600 font-mono flex items-center justify-between mt-0.5">
+              <span>{usuario?.email}</span>
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-700 border border-slate-200 uppercase">
+                {usuario?.rol || "USUARIO"}
+              </span>
+            </div>
           </div>
 
           <button
-            type="button"
-            role="menuitem"
-            aria-expanded={seccion === "empresa"}
             onClick={() => setSeccion(seccion === "empresa" ? null : "empresa")}
             className="mt-1 flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
           >
@@ -152,33 +123,23 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
           {seccion === "empresa" && (
             <ul role="menu" aria-label="Empresa activa" className="mb-1 ml-2 border-l-2 border-slate-300 pl-2 space-y-1">
               {empresas.map((e) => {
-                const activa = e.company_id === contexto.empresa.id;
+                const activa = e.id === empresaActiva?.id;
                 return (
-                  <li key={e.company_id} role="none">
+                  <li key={e.id} role="none">
                     <button
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={activa}
-                      onClick={async () => {
-                        cerrar();
-                        if (!activa) await cambiarEmpresa(e.company_id);
-                      }}
+                      role="menuitem"
+                      onClick={() => cambiarEmpresa(e.id)}
                       className={[
-                        "flex w-full items-baseline justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors font-medium",
+                        "flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-xs text-left transition-colors font-medium",
                         activa
                           ? "bg-blue-600 text-white font-bold shadow-sm"
-                          : "text-slate-900 hover:bg-slate-100",
+                          : "text-slate-800 hover:bg-slate-100",
                       ].join(" ")}
                     >
-                      <span>{e.razon_social}</span>
-                      {e.nif && (
-                        <span
-                          className={[
-                            "shrink-0 font-mono text-[10px]",
-                            activa ? "text-blue-100 font-semibold" : "text-slate-500",
-                          ].join(" ")}
-                        >
-                          {e.nif}
+                      <span className="truncate">{e.razon_social || e.nombre}</span>
+                      {activa && (
+                        <span className="text-[10px] ml-1.5 font-bold text-white shrink-0">
+                          ✓ Activa
                         </span>
                       )}
                     </button>
@@ -187,94 +148,62 @@ export default function SessionMenu({ empresas }: { empresas: EmpresaResumen[] }
               })}
               {unaEmpresa && (
                 <li className="px-2 py-1 text-[11px] text-slate-500">
-                  Esta es la única empresa a la que tienes acceso.
+                  Esta es la única empresa a la que tienes acceso (unica empresa a la que tienes acceso).
                 </li>
               )}
             </ul>
           )}
 
           <button
-            type="button"
-            role="menuitem"
-            aria-expanded={seccion === "ejercicio"}
             onClick={() => setSeccion(seccion === "ejercicio" ? null : "ejercicio")}
             className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-slate-900 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-blue-600"
           >
             <span>Cambiar de ejercicio</span>
-            <span className="text-[11px] text-slate-500 font-normal">activo {contexto.ejercicio_activo.ejercicio}</span>
+            <span className="text-[11px] text-slate-500 font-mono font-normal">
+              {ejercicioActivo ? `${ejercicioActivo.anio}` : "Sin seleccionar"}
+            </span>
           </button>
 
           {seccion === "ejercicio" && (
             <ul role="menu" aria-label="Ejercicio activo" className="mb-1 ml-2 border-l-2 border-slate-300 pl-2 space-y-1">
-              {ejercicios.map((e) => {
-                const texto = etiqueta(e.estado, e.es_actual);
-                const activo = e.ejercicio === contexto.ejercicio_activo.ejercicio;
+              {ejercicios?.map((ej) => {
+                const activo = ej.anio === ejercicioActivo?.anio;
                 return (
-                  <li key={e.ejercicio} role="none">
+                  <li key={ej.anio} role="none">
                     <button
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={activo}
-                      aria-disabled={!e.es_seleccionable}
-                      title={!e.es_seleccionable ? "No admite asientos" : undefined}
-                      disabled={!e.es_seleccionable}
-                      onClick={async () => {
-                        cerrar();
-                        if (!activo) await cambiarEjercicio(e.ejercicio);
-                      }}
+                      role="menuitem"
+                      onClick={() => cambiarEjercicio(ej.anio)}
                       className={[
-                        "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors font-medium",
-                        !e.es_seleccionable
-                          ? "cursor-not-allowed opacity-50 text-slate-400"
-                          : activo
+                        "flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-xs text-left transition-colors font-medium",
+                        activo
                           ? "bg-blue-600 text-white font-bold shadow-sm"
-                          : "text-slate-900 hover:bg-slate-100",
+                          : "text-slate-800 hover:bg-slate-100",
                       ].join(" ")}
                     >
-                      <span className={activo ? "text-white font-bold" : clase(e)}>
-                        {e.ejercicio}
-                        {texto && (
-                          <span
-                            className={[
-                              "ml-2 rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                              activo
-                                ? "bg-blue-800 text-white border border-blue-400"
-                                : "bg-amber-100 text-amber-900 border border-amber-300",
-                            ].join(" ")}
-                          >
-                            {texto}
-                          </span>
-                        )}
-                      </span>
-                      <span
-                        className={[
-                          "font-mono text-[11px]",
-                          activo ? "text-blue-100 font-semibold" : "text-slate-500",
-                        ].join(" ")}
-                      >
-                        {e.n_asientos}
+                      <span className="font-mono font-bold">{ej.anio}</span>
+                      <span className={[
+                        "text-[10px] font-mono",
+                        activo ? "text-blue-100" : "text-slate-500",
+                      ].join(" ")}>
+                        {ej.estado} {activo && "✓"}
                       </span>
                     </button>
                   </li>
                 );
               })}
-              {ejercicios.length === 0 && (
-                <li className="px-2 py-1 text-[11px] text-slate-500">La empresa no tiene ejercicios.</li>
-              )}
             </ul>
           )}
 
-          <div className="mt-2 border-t border-slate-200 pt-2">
+          <div className="mt-1 border-t border-slate-200 pt-1">
             <button
-              type="button"
-              role="menuitem"
-              onClick={salir}
-              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-700 hover:bg-rose-50 focus-visible:outline-2 focus-visible:outline-rose-500 transition-colors"
+              onClick={cerrarSesion}
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors"
             >
-              <svg aria-hidden="true" viewBox="0 0 16 16" className="h-4 w-4 fill-current">
-                <path d="M6 1H3a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h3v-1.5H3.5V2.5H6V1Zm7.3 4.3-1.1-1.1L10.4 6H7v4h3.4l-1.8 1.8 1.1 1.1L14 9l-3.7-3.7Z" />
+              <span>Cerrar sesión</span>
+              <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path fillRule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l2.473-2.47a.75.75 0 10-1.06-1.064l-3.75 3.75a.75.75 0 000 1.064l3.75 3.75a.75.75 0 101.06-1.064L8.704 10.75h9.546A.75.75 0 0019 10z" clipRule="evenodd" />
               </svg>
-              Cerrar sesión
             </button>
           </div>
         </div>
