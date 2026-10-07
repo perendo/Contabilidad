@@ -284,3 +284,6 @@ export function getEjercicioLocal(): number | null {
 export function getEmpresaLocal(): string | null {
   return getEmpresaActiva();
 }
+
+/** Alias en inglés para compatibilidad con componentes que importen useSession */
+export const useSession = useSesion;

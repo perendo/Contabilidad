@@ -9,12 +9,12 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "./SessionContext";
+import { useSesion } from "./SessionContext";
 import { setEjercicioActivo } from "./ejercicio";
 
 export default function SessionMenu() {
   const router = useRouter();
-  const { contexto, recargar } = useSession();
+  const { contexto, recargar } = useSesion();
   const [abierto, setAbierto] = useState(false);
   const [seccion, setSeccion] = useState<"empresa" | "ejercicio" | null>(null);
   const contenedor = useRef<HTMLDivElement>(null);
