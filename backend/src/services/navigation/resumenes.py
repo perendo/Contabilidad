@@ -112,14 +112,18 @@ async def _contabilidad(db: AsyncSession, empresa_id: int, ejercicio: int) -> di
     ultimo = (
         await db.execute(
             sa.select(JournalEntry.numero_asiento, JournalEntry.fecha, JournalEntry.concepto)
-            .where(JournalEntry.empresa_id == empresa_id, JournalEntry.ejercicio == ejercicio)
+            .where(
+                JournalEntry.empresa_id == empresa_id,
+                JournalEntry.ejercicio == ejercicio,
+                JournalEntry.numero_asiento.is_not(None),
+            )
             .order_by(JournalEntry.fecha.desc(), JournalEntry.numero_asiento.desc())
             .limit(1)
         )
     ).first()
 
     metricas = [_metrica("asientos", "Asientos del ejercicio", int(total or 0))]
-    if ultimo is not None:
+    if ultimo is not None and ultimo[0] is not None:
         metricas.append(
             _metrica("ultimo_asiento", "Último asiento", int(ultimo[0]), "numero")
         )
