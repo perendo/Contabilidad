@@ -24,6 +24,12 @@ Sistema de contabilidad multiempresa (multi-tenant) para el Plan General Contabl
 > implementar; consultar [AGENTS.md](AGENTS.md) para el inventario canónico.
 
 
+## Actualizaciones recientes (2026-10-08)
+- **Operativa de Asientos y Libro Diario**: Botón directo **«+ Nuevo Asiento»** en la cabecera de `/asientos/diario` y opción visible en el panel de navegación de Contabilidad para agilizar el registro contable diario.
+- **Formateo Monetario Estándar Español (es-ES)**: Separador de miles con punto y decimal con coma (ej. `1.250,65 €`) en adeudos, abonos, extractos, saldos contables y libro mayor (`frontend/src/lib/formato.ts`).
+- **Conciliación Bancaria Interactiva**: Soporte Norma 43, Excel y CSV con botón **«Conciliar extracto»** para abrir sesiones y casación automática/manual de movimientos con apuntes contables (`/conciliacion/[id]`).
+- **Estabilidad Next.js 15**: Inclusión de los límites de error estándar (`error.tsx`, `global-error.tsx` y `not-found.tsx`) para prevenir bucles de refresco.
+
 ## Funcionalidad principal
 
 - **Navegación por superficies (Material Design 3)**: seis superficies (Contabilidad,

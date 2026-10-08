@@ -3,6 +3,23 @@
 Guía de contexto para agentes que trabajan en este repositorio. Léela al inicio de
 cada sesión; el estado completo se persiste en `specs/*/` y `.specify/memory/`.
 
+## 52. Actualizaciones del Sistema, Conciliación y Usabilidad (2026-10-08)
+- **Gestión y Alta de Asientos**:
+  - Incorporado botón de acción directa **«+ Nuevo Asiento»** en la cabecera del Libro Diario (`/asientos/diario`) con enlace directo a `/asientos/nuevo`.
+  - Promovido el destino **«Nuevo asiento»** en el mapa de superficies (`frontend/src/components/navigation/surfaces.ts`) para acceso inmediato desde la barra y panel de Contabilidad.
+  - Columna de acción directa *«Ver detalle →»* en la tabla de consulta del diario.
+- **Formateo Monetario Estándar Español (es-ES)**:
+  - Implementado nuevo módulo `frontend/src/lib/formato.ts` (`formatearMoneda` y `formatearDecimal4`).
+  - Todos los importes de debe/haber (adeudos y abonos), saldos de extractos, movimientos bancarios y conciliaciones se muestran con **punto en los millares y coma decimal** (ej. `1.250,65 €`).
+- **Resiliencia de Next.js 15 (Error Boundaries)**:
+  - Incorporados componentes obligatorios `error.tsx`, `global-error.tsx` y `not-found.tsx` en `frontend/src/app/`, eliminando los bucles de refresco (*«missing required error components, refreshing...»*).
+- **Módulo de Conciliación Bancaria**:
+  - Incorporado botón directo **«Conciliar extracto»** en la tabla de extractos (`/conciliacion`), enlazando automáticamente con `POST /api/v1/conciliaciones`.
+  - Nueva interfaz interactiva en `/conciliacion/[id]` para casación automática (*«⚡ Generar Propuestas Automáticas»*) y casación manual seleccionando movimiento bancario y apunte contable.
+- **Robustez en Resúmenes y Menú de Sesión**:
+  - Corrección de `TypeError` en `services/navigation/resumenes.py` al consultar asientos en estado borrador (`DRAFT`) con `numero_asiento = NULL`.
+  - Exportación canónica del alias `useSession` en `SessionContext.tsx` y unificación en `SessionMenu.tsx`.
+
 ## 46. Auditoría Técnica y Actualizaciones (2026-09-28)
 - **Autenticación y Autorización en Frontend**: Corregidos los módulos `components/treasury/api.ts`, `services/acct/api.ts`, `components/forex/api.ts`, `components/inmovilizado/api.ts` y `components/ngo/api.ts` para inyectar la cabecera `Authorization: Bearer <token>` junto con las cabeceras de contexto de empresa (`X-Empresa-Activa`), resolviendo los errores 401 en todas las pantallas.
 - **Migración Seed Demo (`023_seed_demo.sql`)**: Se incorpora la siembra inicial de la empresa "Empresa Demo S.L." (NIF `B12345678`), el usuario `admin@contabilidad.es` (clave `admin123`) con rol `ADMIN`, y el ejercicio 2026 abierto para habilitar la interacción inmediata.
