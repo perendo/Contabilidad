@@ -2,10 +2,10 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-
 import { DocumentosAsiento } from "../../../components/documentos/DocumentosAsiento";
 import { ApiError } from "../../../components/treasury/api";
 import { get, post } from "../../../services/client";
+import { formatearMoneda } from "@/lib/formato";
 
 interface Linea {
   account_id: number | null;
@@ -79,6 +79,7 @@ export default function DetalleAsientoPage() {
               {detalle.estado}
             </span>
           </p>
+
           {detalle.estado === "DRAFT" && (
             <button
               onClick={asentar}
@@ -87,33 +88,33 @@ export default function DetalleAsientoPage() {
               Asentar en el libro diario
             </button>
           )}
+
           {detalle.estado === "POSTED" && (
             <button onClick={anular} className="bg-red-600 text-white rounded px-3 py-1 mb-4">
               Anular con rectificativo
             </button>
           )}
+
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="border-b">
                 <th className="text-left p-2">Cuenta</th>
-                <th className="text-right p-2">Debe</th>
-                <th className="text-right p-2">Haber</th>
+                <th className="text-right p-2">Debe (Adeudo)</th>
+                <th className="text-right p-2">Haber (Abono)</th>
               </tr>
             </thead>
             <tbody>
               {detalle.lineas.map((l, i) => (
                 <tr key={i} className="border-b">
                   <td className="p-2 font-mono">{l.account_code}</td>
-                  <td className="text-right p-2 font-mono">{l.debit}</td>
-                  <td className="text-right p-2 font-mono">{l.credit}</td>
+                  <td className="text-right p-2 font-mono">{formatearMoneda(l.debit)}</td>
+                  <td className="text-right p-2 font-mono">{formatearMoneda(l.credit)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {/* SPEC-030: la seccion declara que los adjuntos son opcionales y no
-              toca las cifras del asiento (FR-015, FR-020). El estado del
-              asiento se pasa desde el `Detalle` ya cargado, sin un segundo
-              fetch. */}
+
+          {/* SPEC-030: adjuntos opcionales */}
           <DocumentosAsiento
             asientoId={detalle.id}
             estadoAsiento={detalle.estado}

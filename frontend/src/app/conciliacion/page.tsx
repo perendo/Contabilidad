@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../../components/treasury/api";
 import { get, post } from "../../services/client";
+import { formatearMoneda } from "@/lib/formato";
 
 interface Extracto {
   id: string;
@@ -143,48 +144,43 @@ export default function ConciliacionPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {extractos.map((e) => {
-                  const tieneConciliacion = conciliaciones.some(
-                    (c) => String(c.cuenta_id) === String(e.cuenta_id)
-                  );
-                  return (
-                    <tr key={e.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="p-3 font-mono font-medium text-slate-900">
-                        {e.fecha_inicio} → {e.fecha_fin}
-                      </td>
-                      <td className="text-right p-3 font-mono font-bold text-slate-900">
-                        {e.saldo_final} €
-                      </td>
-                      <td className="text-right p-3 font-mono text-slate-700">
-                        {e.n_movimientos}
-                      </td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 uppercase">
-                          {e.estado}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() => iniciarConciliacion(e)}
-                          disabled={iniciandoId === e.id}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors disabled:opacity-50 inline-flex items-center gap-1"
-                        >
-                          {iniciandoId === e.id ? (
-                            "Iniciando..."
-                          ) : (
-                            <>
-                              <span>Conciliar extracto</span>
-                              <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                                <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
-                              </svg>
-                            </>
-                          )}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {extractos.map((e) => (
+                  <tr key={e.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="p-3 font-mono font-medium text-slate-900">
+                      {e.fecha_inicio} → {e.fecha_fin}
+                    </td>
+                    <td className="text-right p-3 font-mono font-bold text-slate-900">
+                      {formatearMoneda(e.saldo_final, true)}
+                    </td>
+                    <td className="text-right p-3 font-mono text-slate-700">
+                      {e.n_movimientos}
+                    </td>
+                    <td className="p-3">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+                        {e.estado}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => iniciarConciliacion(e)}
+                        disabled={iniciandoId === e.id}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors disabled:opacity-50 inline-flex items-center gap-1"
+                      >
+                        {iniciandoId === e.id ? (
+                          "Iniciando..."
+                        ) : (
+                          <>
+                            <span>Conciliar extracto</span>
+                            <svg aria-hidden="true" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                            </svg>
+                          </>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -240,14 +236,14 @@ export default function ConciliacionPage() {
                         </span>
                       </td>
                       <td className="text-right p-3 font-mono text-slate-900">
-                        {c.saldo_banco ?? "0.00"} €
+                        {formatearMoneda(c.saldo_banco, true)}
                       </td>
                       <td className="text-right p-3 font-mono text-slate-900">
-                        {c.saldo_libros ?? "0.00"} €
+                        {formatearMoneda(c.saldo_libros, true)}
                       </td>
                       <td className="text-right p-3 font-mono font-bold">
                         <span className={cuadrada ? "text-emerald-700" : "text-amber-700"}>
-                          {c.diferencia} €
+                          {formatearMoneda(c.diferencia, true)}
                         </span>
                       </td>
                       <td className="p-3 text-right">

@@ -191,8 +191,8 @@ export default function LineEditor({
           Quitar última (Ctrl+Supr)
         </button>
         <span className={cuadra ? "text-emerald-700" : "text-amber-700"}>
-          Debe {totalDebe.toFixed(4)} · Haber {totalHaber.toFixed(4)} ·{" "}
-          {cuadra ? "Cuadra" : `Diferencia ${diferencia.toFixed(4)}`}
+          Debe {totalDebe.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · Haber {totalHaber.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ·{" "}
+          {cuadra ? "Cuadra" : `Diferencia ${diferencia.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
         </span>
         <button
           type="button"

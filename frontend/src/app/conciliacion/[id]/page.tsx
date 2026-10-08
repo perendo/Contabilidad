@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "../../../components/treasury/api";
 import { get, post } from "../../../services/client";
+import { formatearMoneda } from "@/lib/formato";
 
 interface Movimiento {
   id: string;
@@ -182,16 +183,16 @@ export default function DetalleConciliacionPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="space-y-1">
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Saldo Extracto (Banco)</div>
-            <div className="text-lg font-mono font-bold text-slate-900">{informe.saldo_banco} €</div>
+            <div className="text-lg font-mono font-bold text-slate-900">{formatearMoneda(informe.saldo_banco, true)}</div>
           </div>
           <div className="space-y-1">
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Saldo Libros (Contable)</div>
-            <div className="text-lg font-mono font-bold text-slate-900">{informe.saldo_libros} €</div>
+            <div className="text-lg font-mono font-bold text-slate-900">{formatearMoneda(informe.saldo_libros, true)}</div>
           </div>
           <div className="space-y-1">
             <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Diferencia a Cuadrar</div>
             <div className={`text-lg font-mono font-bold ${cuadrada ? "text-emerald-700" : "text-amber-700"}`}>
-              {informe.diferencia} €
+              {formatearMoneda(informe.diferencia, true)}
             </div>
           </div>
           <div className="space-y-1">
@@ -223,7 +224,7 @@ export default function DetalleConciliacionPage() {
                   <span className="font-mono text-slate-700">Movimiento #{p.movimiento_id.slice(0, 8)}</span>
                   <span className="text-slate-400">↔</span>
                   <span className="font-mono text-slate-700">Apunte #{p.apunte_id.slice(0, 8)}</span>
-                  <span className="font-mono font-bold text-slate-900">Importe: {p.importe} €</span>
+                  <span className="font-mono font-bold text-slate-900">Importe: {formatearMoneda(p.importe, true)}</span>
                 </div>
                 <button
                   type="button"
@@ -268,7 +269,7 @@ export default function DetalleConciliacionPage() {
                         <div className="font-medium text-slate-900 truncate">{m.concepto}</div>
                         <div className="text-[10px] text-slate-400 font-mono">Signo: {m.signo} · ID: {m.id.slice(0, 8)}</div>
                       </div>
-                      <div className="font-mono font-bold text-slate-900 shrink-0">{m.importe} €</div>
+                      <div className="font-mono font-bold text-slate-900 shrink-0">{formatearMoneda(m.importe, true)}</div>
                     </li>
                   );
                 })}
@@ -304,7 +305,7 @@ export default function DetalleConciliacionPage() {
                         <div className="font-medium text-slate-900 truncate">{a.descripcion || `Cuenta ${a.cuenta}`}</div>
                         <div className="text-[10px] text-slate-400 font-mono">Cuenta {a.cuenta} · ID: {a.id.slice(0, 8)}</div>
                       </div>
-                      <div className="font-mono font-bold text-slate-900 shrink-0">{importe} €</div>
+                      <div className="font-mono font-bold text-slate-900 shrink-0">{formatearMoneda(importe, true)}</div>
                     </li>
                   );
                 })}
