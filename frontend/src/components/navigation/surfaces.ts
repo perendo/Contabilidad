@@ -109,7 +109,7 @@ export const SUPERFICIES: readonly Superficie[] = [
       d("catalogo-importar", "Importar catálogo", "/catalogo/importar", ACCION),
       d("catalogo-reclasificar", "Reclasificar saldos", "/catalogo/reclasificar", ACCION),
       d("asientos", "Asientos", "/asientos/diario"),
-      d("asientos-nuevo", "Nuevo asiento", "/asientos/nuevo", ACCION),
+      d("asientos-nuevo", "Nuevo asiento", "/asientos/nuevo"),
       d("asientos-detalle", "Detalle de asiento", "/asientos/[id]", HIJO),
       d("plantillas", "Plantillas", "/plantillas"),
       d("plantillas-nueva", "Nueva plantilla", "/plantillas/nueva", ACCION),
